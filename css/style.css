@@ -1,0 +1,115 @@
+/* Custom Styles & Print formatting for Aplikasi Data Warga (SIMWARGA) */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --secondary: #0f172a;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Modal Transition */
+.modal-backdrop {
+  backdrop-filter: blur(4px);
+  transition: all 0.2s ease-out;
+}
+
+/* Print Styling for Surat Pengantar & Stiker QR */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  
+  /* Cetak Surat Pengantar */
+  body.printing-surat #printable-surat,
+  body.printing-surat #printable-surat * {
+    visibility: visible;
+  }
+  body.printing-surat #printable-surat {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 2.5cm 2cm !important;
+    background: white;
+    color: black;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* Cetak Lembar Stiker QR Code */
+  body.printing-stiker #printable-stiker,
+  body.printing-stiker #printable-stiker * {
+    visibility: visible;
+  }
+  body.printing-stiker #printable-stiker {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 1cm !important;
+    background: white;
+    box-shadow: none !important;
+  }
+
+  /* Cetak Laporan Rekapitulasi Iuran per Blok (A4 Landscape) */
+  body.printing-laporan #printable-laporan-iuran,
+  body.printing-laporan #printable-laporan-iuran * {
+    visibility: visible;
+  }
+  body.printing-laporan #printable-laporan-iuran {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 1.5cm !important;
+    background: white;
+    color: black;
+    box-shadow: none !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* Print kop surat style */
+.kop-surat {
+  border-bottom: 3px double #000;
+  padding-bottom: 12px;
+  margin-bottom: 24px;
+}
+
+/* Badge pulse animation for active security alerts */
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+

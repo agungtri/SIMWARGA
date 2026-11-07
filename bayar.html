@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Upload Bukti Bayar Iuran Warga - SIMWARGA</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased min-h-screen flex flex-col justify-between">
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed top-4 right-4 left-4 sm:left-auto sm:w-96 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Header Mobile Friendly -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+    <div class="max-w-md mx-auto px-4 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
+          <i data-lucide="qr-code" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 class="text-sm font-bold text-slate-900 leading-tight">Konfirmasi Iuran Warga</h1>
+          <p id="header-wilayah" class="text-[11px] text-slate-500 font-medium">RT 03 / RW 07 Kelurahan Sukamaju</p>
+        </div>
+      </div>
+      <a href="index.html" class="p-2 text-slate-400 hover:text-slate-600 rounded-lg text-xs flex items-center gap-1 font-medium" title="Kembali ke Dasbor">
+        <i data-lucide="home" class="w-4 h-4"></i>
+      </a>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-md mx-auto w-full p-4 flex-1 space-y-4">
+
+    <!-- Card 1: Identitas Unit Rumah Hasil Scan QR Stiker -->
+    <div class="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-3xl p-5 shadow-lg shadow-blue-500/15 relative overflow-hidden">
+      <div class="relative z-10 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/20 text-white text-[11px] font-semibold backdrop-blur-xs">
+            <i data-lucide="check-circle-2" class="w-3 h-3 text-emerald-300"></i>
+            <span>QR Stiker Terverifikasi</span>
+          </span>
+          <span id="badge-tenant-id" class="text-[10px] text-blue-200 font-mono">RT.03-RW.07</span>
+        </div>
+
+        <div>
+          <p class="text-xs text-blue-100 uppercase tracking-wider font-semibold">Alamat Rumah Warga</p>
+          <h2 id="disp-blok-rumah" class="text-2xl font-black tracking-tight text-white mt-0.5">Blok A No. 14</h2>
+          <p id="disp-nama-penghuni" class="text-sm font-medium text-blue-50">Bpk. Hendra Wijaya</p>
+          <p id="disp-alamat-lengkap" class="text-xs text-blue-200 mt-1">Jl. Merak Blok A No. 14</p>
+        </div>
+
+        <div class="pt-2 border-t border-white/15 flex items-center justify-between text-xs">
+          <span class="text-blue-100">Tarif Iuran Rutin / Bulan:</span>
+          <span id="disp-tarif-iuran" class="font-extrabold text-sm text-yellow-300">Rp 50.000</span>
+        </div>
+      </div>
+
+      <div class="absolute -right-4 -bottom-6 opacity-10 pointer-events-none">
+        <i data-lucide="home" class="w-36 h-36"></i>
+      </div>
+    </div>
+
+    <!-- Card 2: Rekening Tujuan Transfer RT -->
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3">
+      <div class="flex items-center justify-between">
+        <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+          <i data-lucide="credit-card" class="w-4 h-4 text-blue-600"></i>
+          <span>Rekening Resmi Kas RT</span>
+        </h3>
+        <span class="text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full font-bold">Aktif</span>
+      </div>
+
+      <div class="bg-slate-50 border border-slate-100 rounded-xl p-3 flex items-center justify-between">
+        <div>
+          <span class="text-[11px] font-bold text-blue-700 block">Bank BCA</span>
+          <span id="rekening-nomor" class="font-mono font-bold text-base text-slate-800">5420-192-881</span>
+          <span class="text-[11px] text-slate-500 block">a.n Kas RT 03 Sukamaju (Bendahara)</span>
+        </div>
+        <button onclick="copyRekening()" class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-xs font-semibold text-slate-700 shadow-xs flex items-center gap-1">
+          <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+          <span>Salin</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Card 3: Form Upload Bukti Transfer -->
+    <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs space-y-4">
+      <div class="border-b border-slate-100 pb-3">
+        <h3 class="text-sm font-bold text-slate-900">Formulir Konfirmasi Pembayaran</h3>
+        <p class="text-xs text-slate-500">Unggah foto struk ATM / tangkapan layar m-Banking</p>
+      </div>
+
+      <form id="form-upload-bayar" onsubmit="handleFormSubmit(event)" class="space-y-4 text-xs">
+        
+        <!-- Pilihan Periode Bulan -->
+        <div>
+          <label class="font-semibold text-slate-700 block mb-1">Periode Pembayaran Iuran *</label>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+            <div>
+              <span class="text-[11px] text-slate-500 block mb-1">Mulai Bulan:</span>
+              <select id="input-mulai-bulan" onchange="updatePeriodeMultiBulan()" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-medium focus:outline-none focus:border-blue-500">
+                <option value="2026-01">Januari 2026</option>
+                <option value="2026-02">Februari 2026</option>
+                <option value="2026-03">Maret 2026</option>
+                <option value="2026-04">April 2026</option>
+                <option value="2026-05">Mei 2026</option>
+                <option value="2026-06">Juni 2026</option>
+                <option value="2026-07">Juli 2026</option>
+                <option value="2026-08">Agustus 2026</option>
+                <option value="2026-09">September 2026</option>
+                <option value="2026-10" selected>Oktober 2026</option>
+                <option value="2026-11">November 2026</option>
+                <option value="2026-12">Desember 2026</option>
+              </select>
+            </div>
+            <div>
+              <span class="text-[11px] text-slate-500 block mb-1">Jumlah Bulan:</span>
+              <select id="input-jumlah-bulan" onchange="updatePeriodeMultiBulan()" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-medium focus:outline-none focus:border-blue-500">
+                <option value="1" selected>1 Bulan (Rutin)</option>
+                <option value="2">2 Bulan</option>
+                <option value="3">3 Bulan (Triwulan)</option>
+                <option value="6">6 Bulan (Semester)</option>
+                <option value="12">12 Bulan (1 Tahun Penuh)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="p-2.5 rounded-xl bg-blue-50/70 border border-blue-100 flex items-center justify-between">
+            <div>
+              <span class="text-[10px] text-blue-600 font-bold block uppercase tracking-wider">Cakupan Periode:</span>
+              <span id="label-periode-cakupan" class="text-xs font-bold text-slate-800">Oktober 2026 (1 Bulan)</span>
+            </div>
+            <div class="text-right">
+              <span class="text-[10px] text-slate-500 block">Total Wajib:</span>
+              <input type="number" id="input-nominal-bayar" required value="50000" class="w-28 px-2 py-1 rounded-lg border border-slate-300 bg-white font-mono font-bold text-emerald-600 text-right text-xs focus:outline-none focus:border-blue-500">
+            </div>
+          </div>
+          <input type="hidden" id="input-periode-bulan" value="2026-10">
+        </div>
+
+        <!-- Area Upload Gambar / Kamera -->
+        <div>
+          <label class="font-semibold text-slate-700 block mb-1.5">Foto Bukti Struk / Screenshot *</label>
+          
+          <!-- Hidden File Input -->
+          <input type="file" id="input-file-gambar" accept="image/*" class="hidden" onchange="handleFileSelected(event)">
+
+          <!-- Dropzone Container -->
+          <div id="dropzone-area" onclick="triggerFileInput()" class="border-2 border-dashed border-slate-200 hover:border-blue-500 rounded-2xl p-6 text-center cursor-pointer transition-colors bg-slate-50/60 flex flex-col items-center justify-center min-h-[170px]">
+            <div id="upload-prompt" class="space-y-2">
+              <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mx-auto shadow-inner">
+                <i data-lucide="camera" class="w-6 h-6"></i>
+              </div>
+              <div>
+                <p class="font-bold text-slate-800 text-xs">Ambil Foto atau Pilih Gambar</p>
+                <p class="text-[11px] text-slate-400 mt-0.5">Mendukung format JPG, PNG, WEBP (Otomatis dikompresi)</p>
+              </div>
+            </div>
+
+            <!-- Preview Image (Hidden by default) -->
+            <div id="preview-wrapper" class="hidden w-full space-y-2">
+              <div class="relative rounded-xl overflow-hidden border border-slate-200 max-h-56 bg-slate-900 flex items-center justify-center">
+                <img id="img-preview" src="" alt="Bukti Transfer" class="max-h-56 w-auto object-contain">
+                <button type="button" onclick="cancelImage(event)" class="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-white hover:bg-black/80" title="Ganti Foto">
+                  <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+              </div>
+              <div class="flex items-center justify-between text-[11px] text-slate-500 px-1">
+                <span id="file-size-info">Ukuran: 0 KB (WebP Kompres)</span>
+                <span class="text-emerald-600 font-semibold flex items-center gap-1">
+                  <i data-lucide="check" class="w-3 h-3"></i> Siap Dikirim
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Nomor Referensi / Catatan Opsional -->
+        <div>
+          <label class="font-semibold text-slate-700 block mb-1">Nomor Referensi Bank / Catatan (Opsional)</label>
+          <input type="text" id="input-no-referensi" placeholder="Contoh: Ref BCA 0912984, atau 'Bayar 2 bulan'" class="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-500">
+        </div>
+
+        <!-- Tombol Submit -->
+        <button type="submit" id="btn-submit" class="w-full py-3.5 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center gap-2">
+          <i data-lucide="send" class="w-4 h-4"></i>
+          <span>Kirim Konfirmasi Pembayaran</span>
+        </button>
+
+        <!-- Kotak Berhasil & Tombol WA -->
+        <div id="box-sukses-wa" class="hidden p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-center space-y-2.5">
+          <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+            <i data-lucide="check-circle" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <h4 class="font-bold text-emerald-900 text-xs">Bukti Pembayaran Terkirim!</h4>
+            <p class="text-[11px] text-emerald-700">Data Anda sudah masuk antrean verifikasi bendahara RT.</p>
+          </div>
+          <button type="button" id="btn-kirim-wa-bendahara" onclick="kirimNotifWaBendahara()" class="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20">
+            <i data-lucide="message-circle" class="w-4 h-4"></i>
+            <span>Kirim Notifikasi ke WhatsApp Bendahara</span>
+          </button>
+        </div>
+
+      </form>
+    </div>
+
+    <!-- Card 4: Kartu Iuran Digital 12 Bulan -->
+    <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs space-y-3">
+      <div class="flex items-center justify-between">
+        <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+          <i data-lucide="calendar-check" class="w-4 h-4 text-blue-600"></i>
+          <span>Kartu Iuran Digital 2026</span>
+        </h3>
+        <span id="badge-kartu-persen" class="text-[10px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full font-bold">0/12 Lunas</span>
+      </div>
+      <div id="grid-kartu-12bulan" class="grid grid-cols-3 sm:grid-cols-4 gap-2 text-center text-xs">
+        <!-- Akan di-render otomatis via JS -->
+      </div>
+    </div>
+
+    <!-- Card 5: Riwayat Pengajuan Struk -->
+    <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs space-y-3">
+      <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+        <i data-lucide="history" class="w-4 h-4 text-blue-600"></i>
+        <span>Riwayat Upload Struk Rumah Ini</span>
+      </h3>
+      <div id="container-riwayat-unit" class="space-y-2">
+        <!-- Akan di-render otomatis via JS -->
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="py-4 text-center text-xs text-slate-400">
+    SIMWARGA &bull; Sistem Layanan Kependudukan & Kas RT Mandiri
+  </footer>
+
+  <!-- Scripts -->
+  <script src="js/store.js"></script>
+  <script>
+    // State Halaman Bayar
+    let currentUnit = null;
+    let compressedImageData = null;
+    let imageHash = null;
+    let lastSubmittedTrx = null;
+
+    // Toast helper
+    function showToast(message, type = 'success') {
+      const toastContainer = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      const bg = type === 'success' ? 'bg-emerald-600' : 'bg-rose-600';
+      toast.className = `p-3 rounded-xl shadow-xl text-white text-xs font-medium flex items-center gap-2 ${bg} transition-all duration-300 transform translate-y-2 opacity-0`;
+      toast.innerHTML = `<span>${type === 'success' ? '✓' : '✕'}</span> <span>${message}</span>`;
+      toastContainer.appendChild(toast);
+      setTimeout(() => toast.classList.remove('translate-y-2', 'opacity-0'), 10);
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    // Salin Rekening
+    function copyRekening() {
+      const nomor = document.getElementById('rekening-nomor').innerText.replace(/-/g, '');
+      navigator.clipboard.writeText(nomor).then(() => {
+        showToast('Nomor rekening berhasil disalin!');
+      }).catch(() => {
+        showToast('Salin manual: ' + nomor);
+      });
+    }
+
+    // Hitung Periode Multi-Bulan & Nominal Otomatis
+    function updatePeriodeMultiBulan() {
+      const startVal = document.getElementById('input-mulai-bulan')?.value || '2026-10';
+      const count = parseInt(document.getElementById('input-jumlah-bulan')?.value || '1', 10);
+      const settings = SimStore.getSettings();
+      const tarif = Number(settings.tarifIuranBulanan) || 50000;
+
+      const [startYearStr, startMonthStr] = startVal.split('-');
+      let year = parseInt(startYearStr, 10);
+      let month = parseInt(startMonthStr, 10);
+
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+      const monthCodes = [];
+      const monthLabels = [];
+
+      for (let i = 0; i < count; i++) {
+        let curMonth = month + i;
+        let curYear = year;
+        while (curMonth > 12) {
+          curMonth -= 12;
+          curYear += 1;
+        }
+        const mKey = `${curYear}-${String(curMonth).padStart(2, '0')}`;
+        monthCodes.push(mKey);
+        monthLabels.push(`${monthNames[curMonth - 1]} ${curYear}`);
+      }
+
+      const totalNominal = count * tarif;
+      const hiddenInput = document.getElementById('input-periode-bulan');
+      if (hiddenInput) hiddenInput.value = monthCodes.join(', ');
+
+      const cakupanLabel = document.getElementById('label-periode-cakupan');
+      if (cakupanLabel) {
+        if (count === 1) {
+          cakupanLabel.textContent = `${monthLabels[0]} (1 Bulan)`;
+        } else {
+          cakupanLabel.textContent = `${monthLabels[0]} s/d ${monthLabels[monthLabels.length - 1]} (${count} Bulan)`;
+        }
+      }
+
+      const nominalInput = document.getElementById('input-nominal-bayar');
+      if (nominalInput) {
+        nominalInput.value = totalNominal;
+      }
+    }
+      navigator.clipboard.writeText(nomor).then(() => {
+        showToast('Nomor rekening berhasil disalin!');
+      }).catch(() => {
+        showToast('Salin manual: ' + nomor);
+      });
+    }
+
+    // Trigger File Input
+    function triggerFileInput() {
+      if (!compressedImageData) {
+        document.getElementById('input-file-gambar').click();
+      }
+    }
+
+    // Cancel Image Selection
+    function cancelImage(e) {
+      e.stopPropagation();
+      compressedImageData = null;
+      imageHash = null;
+      document.getElementById('input-file-gambar').value = '';
+      document.getElementById('upload-prompt').classList.remove('hidden');
+      document.getElementById('preview-wrapper').classList.add('hidden');
+      document.getElementById('img-preview').src = '';
+    }
+
+    // Compress Image to WebP using HTML5 Canvas & Compute SHA-256 Hash
+    async function handleFileSelected(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      if (!file.type.startsWith('image/')) {
+        showToast('Format berkas harus berupa gambar!', 'error');
+        return;
+      }
+
+      // Hitung Hash SHA-256 berkas asli untuk anti-duplikasi
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        imageHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      } catch (err) {
+        imageHash = 'hash_' + Date.now();
+      }
+
+      // Kompresi di sisi browser via Canvas
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          const maxDim = 1200;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height && width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Convert to WebP format with 0.8 quality
+          compressedImageData = canvas.toDataURL('image/webp', 0.82);
+          
+          // Estimasikan ukuran berkas
+          const approxSizeKb = Math.round((compressedImageData.length * (3/4)) / 1024);
+
+          // Tampilkan Preview
+          document.getElementById('img-preview').src = compressedImageData;
+          document.getElementById('file-size-info').textContent = `Ukuran: ${approxSizeKb} KB (WebP Kompres)`;
+          document.getElementById('upload-prompt').classList.add('hidden');
+          document.getElementById('preview-wrapper').classList.remove('hidden');
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Load Unit Warga berdasarkan parameter URL
+    function initUnitData() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const unitParam = urlParams.get('unit');
+      const blokParam = urlParams.get('blok');
+      const noParam = urlParams.get('no');
+      const namaParam = urlParams.get('nama');
+
+      const unitList = SimStore.getUnitRumah();
+      const settings = SimStore.getSettings();
+
+      // Set header
+      document.getElementById('header-wilayah').textContent = `${settings.namaRt} / ${settings.namaRw} Kelurahan ${settings.kelurahan}`;
+      document.getElementById('disp-tarif-iuran').textContent = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(settings.tarifIuranBulanan || 50000);
+      document.getElementById('input-nominal-bayar').value = settings.tarifIuranBulanan || 50000;
+
+      // Cari unit
+      if (unitParam) {
+        currentUnit = unitList.find(u => u.id === unitParam);
+      } else if (blokParam && noParam) {
+        currentUnit = unitList.find(u => u.blok.toLowerCase() === blokParam.toLowerCase() && u.nomorRumah === noParam);
+      }
+
+      // Jika belum ketemu, ambil unit pertama sebagai default sample demo
+      if (!currentUnit && unitList.length > 0) {
+        currentUnit = unitList[1] || unitList[0];
+      }
+
+      if (currentUnit) {
+        document.getElementById('disp-blok-rumah').textContent = `${currentUnit.blok} No. ${currentUnit.nomorRumah}`;
+        document.getElementById('disp-nama-penghuni').textContent = currentUnit.namaPenghuni;
+        document.getElementById('disp-alamat-lengkap').textContent = currentUnit.alamat || `${currentUnit.blok} No. ${currentUnit.nomorRumah}`;
+        document.getElementById('badge-tenant-id').textContent = currentUnit.id;
+      }
+
+      updatePeriodeMultiBulan();
+      renderRiwayatUnit();
+    }
+
+    // Render Riwayat Pembayaran Unit Ini & Kartu 12 Bulan
+    function renderRiwayatUnit() {
+      if (!currentUnit) return;
+      const buktiList = SimStore.getBuktiBayar().filter(b => b.unitId === currentUnit.id || (b.blok === currentUnit.blok && b.nomorRumah === currentUnit.nomorRumah));
+      const container = document.getElementById('container-riwayat-unit');
+      const gridKartu = document.getElementById('grid-kartu-12bulan');
+
+      // 1. Render Kartu 12 Bulan (Tahun 2026)
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+      let lunasCount = 0;
+
+      gridKartu.innerHTML = monthNames.map((mName, idx) => {
+        const mKey = `2026-${String(idx + 1).padStart(2, '0')}`;
+        // Cocokkan baik single month ("2026-10") maupun multi-bulan ("2026-10, 2026-11, ...")
+        const item = buktiList.find(b => (b.periodeBulan || '').split(',').map(s => s.trim()).includes(mKey));
+
+        if (item && item.statusVerifikasi === 'Terverifikasi') {
+          lunasCount++;
+          return `
+            <div class="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800">
+              <span class="font-bold text-[11px] block">${mName}</span>
+              <span class="text-[9px] font-extrabold text-emerald-600 uppercase">✓ Lunas</span>
+            </div>
+          `;
+        } else if (item && item.statusVerifikasi === 'Menunggu Verifikasi') {
+          return `
+            <div class="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800">
+              <span class="font-bold text-[11px] block">${mName}</span>
+              <span class="text-[9px] font-bold text-amber-600">Diproses</span>
+            </div>
+          `;
+        } else {
+          return `
+            <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-slate-400">
+              <span class="font-bold text-[11px] block">${mName}</span>
+              <span class="text-[9px]">Belum</span>
+            </div>
+          `;
+        }
+      }).join('');
+
+      document.getElementById('badge-kartu-persen').textContent = `${lunasCount}/12 Lunas`;
+
+      // 2. Render Riwayat Berkas
+      if (buktiList.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-400 py-2 text-center">Belum ada riwayat pembayaran yang tercatat.</p>`;
+        return;
+      }
+
+      container.innerHTML = buktiList.map(b => `
+        <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs">
+          <div>
+            <span class="font-bold text-slate-800">Periode: ${b.periodeBulan}</span>
+            <span class="text-slate-400 block text-[11px]">${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(b.nominal)}</span>
+          </div>
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${b.statusVerifikasi === 'Terverifikasi' ? 'bg-emerald-100 text-emerald-700' : b.statusVerifikasi === 'Ditolak' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}">
+            ${b.statusVerifikasi}
+          </span>
+        </div>
+      `).join('');
+    }
+
+    // Submit Handler
+    function handleFormSubmit(event) {
+      event.preventDefault();
+
+      if (!compressedImageData) {
+        showToast('Silakan ambil foto atau unggah gambar bukti transfer!', 'error');
+        return;
+      }
+
+      const periodeBulan = document.getElementById('input-periode-bulan').value;
+      const nominal = Number(document.getElementById('input-nominal-bayar').value);
+      const noReferensi = document.getElementById('input-no-referensi').value.trim();
+
+      // Cek Validasi Ganda Anti-Kecurangan
+      // 1. Hash Gambar SHA-256
+      const existingHash = SimStore.getBuktiBayar().find(b => b.imageHash === imageHash);
+      if (existingHash) {
+        showToast('Peringatan: Gambar bukti transfer ini terdeteksi sudah pernah diunggah sebelumnya!', 'error');
+        return;
+      }
+
+      // 2. Nomor Referensi Bank Unik (jika diisi)
+      if (noReferensi) {
+        const existingRef = SimStore.getBuktiBayar().find(b => b.nomorReferensi && b.nomorReferensi.toLowerCase() === noReferensi.toLowerCase());
+        if (existingRef) {
+          showToast('Peringatan: Nomor referensi transfer ini sudah pernah digunakan sebelumnya!', 'error');
+          return;
+        }
+      }
+
+      const newTrx = {
+        unitId: currentUnit?.id || 'UNIT-GEN',
+        nama: currentUnit?.namaPenghuni || 'Warga',
+        blok: currentUnit?.blok || 'Blok A',
+        nomorRumah: currentUnit?.nomorRumah || '01',
+        periodeBulan,
+        nominal,
+        tanggalBayar: new Date().toISOString().split('T')[0],
+        nomorReferensi: noReferensi || `REF-${Date.now().toString().slice(-6)}`,
+        statusVerifikasi: 'Menunggu Verifikasi',
+        imageHash: imageHash || 'hash_' + Date.now(),
+        imageUrl: compressedImageData,
+        catatan: `Konfirmasi iuran ${periodeBulan} via scan QR stiker`
+      };
+
+      SimStore.addBuktiBayar(newTrx);
+      lastSubmittedTrx = newTrx;
+
+      showToast('Bukti pembayaran berhasil dikirim! Menunggu verifikasi pengurus RT.');
+
+      // Tampilkan Tombol Notifikasi WA ke Bendahara
+      const boxSukses = document.getElementById('box-sukses-wa');
+      if (boxSukses) {
+        boxSukses.classList.remove('hidden');
+      }
+
+      // Reset form
+      cancelImage({ stopPropagation: () => {} });
+      document.getElementById('input-no-referensi').value = '';
+      renderRiwayatUnit();
+    }
+
+    // Dispatch Notifikasi Cepat ke WhatsApp Pengurus/Bendahara
+    function kirimNotifWaBendahara() {
+      if (!lastSubmittedTrx) return;
+      const textMsg = encodeURIComponent(
+        `Halo Bendahara RT, saya ${lastSubmittedTrx.nama} (${lastSubmittedTrx.blok} No. ${lastSubmittedTrx.nomorRumah}) baru saja mengunggah konfirmasi bukti transfer iuran untuk periode ${lastSubmittedTrx.periodeBulan} sebesar Rp ${lastSubmittedTrx.nominal.toLocaleString('id-ID')}.\n\nMohon diverifikasi melalui sistem SIMWARGA. Terima kasih.`
+      );
+      window.open(`https://wa.me/?text=${textMsg}`, '_blank');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.lucide) lucide.createIcons();
+      initUnitData();
+    });
+  </script>
+</body>
+</html>
+

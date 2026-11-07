@@ -1,0 +1,17 @@
+# Operating System Files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Editor / IDE Files
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Temporary & Scratch Files
+*.tmp
+*.log
+/scratch/

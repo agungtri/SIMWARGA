@@ -60,6 +60,18 @@
   <!-- Main Container -->
   <main class="max-w-md mx-auto w-full p-4 flex-1 space-y-4">
 
+    <!-- Gerbang: tampil saat link tidak membawa token yang sah -->
+    <div id="gerbang-token" class="hidden bg-white rounded-3xl p-6 shadow-sm border border-slate-200 text-center space-y-3">
+      <div class="w-14 h-14 mx-auto rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+        <i data-lucide="lock" class="w-7 h-7"></i>
+      </div>
+      <h2 id="gerbang-judul" class="text-lg font-bold text-slate-800">Link pembayaran diperlukan</h2>
+      <p id="gerbang-pesan" class="text-sm text-slate-500 leading-relaxed">Halaman ini hanya bisa dibuka melalui link pembayaran pribadi yang diberikan pengurus RT.</p>
+      <p class="text-[11px] text-slate-400 pt-1">SIMWARGA &bull; Layanan Kependudukan &amp; Kas RT Mandiri</p>
+    </div>
+
+    <div id="konten-bayar" class="space-y-4">
+
     <!-- Card 1: Identitas Unit Rumah Hasil Scan QR Stiker -->
     <div class="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-3xl p-5 shadow-lg shadow-blue-500/15 relative overflow-hidden">
       <div class="relative z-10 space-y-3">
@@ -259,6 +271,8 @@
       </div>
     </div>
 
+    </div>
+
   </main>
 
   <!-- Footer -->
@@ -424,10 +438,84 @@
       reader.readAsDataURL(file);
     }
 
+    // ===== Penyamaran parameter unit pada link pembayaran =====
+    // Catatan: kunci ini ikut terkirim ke browser karena situs statis.
+    // Fungsinya menyamarkan ID unit agar link tidak mudah ditebak atau dienumerasi,
+    // bukan menyembunyikan data dari orang yang membaca source code.
+    const LINK_KEY = 'SIMWARGA-RT01-2026';
+
+    function b64urlEncode(bytes) {
+      let bin = '';
+      for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+      return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+
+    function b64urlDecode(str) {
+      const pad = str.length % 4 === 0 ? '' : '='.repeat(4 - (str.length % 4));
+      const bin = atob(str.replace(/-/g, '+').replace(/_/g, '/') + pad);
+      const out = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+      return out;
+    }
+
+    function hashKey(str) {
+      let h = 2166136261 >>> 0;
+      for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619) >>> 0;
+      }
+      return h >>> 0;
+    }
+
+    function keyStream(seed, len) {
+      let s = seed >>> 0;
+      const out = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        s ^= s << 13; s >>>= 0;
+        s ^= s >>> 17;
+        s ^= s << 5; s >>>= 0;
+        out[i] = s & 0xff;
+      }
+      return out;
+    }
+
+    function encryptUnitParam(plain) {
+      const data = new TextEncoder().encode(String(plain));
+      const ks = keyStream(hashKey(LINK_KEY), data.length + 1);
+      const out = new Uint8Array(data.length + 1);
+      out[0] = data.length ^ ks[0];
+      for (let i = 0; i < data.length; i++) {
+        out[i + 1] = data[i] ^ ks[i + 1];
+      }
+      return b64urlEncode(out);
+    }
+
+    function decryptUnitParam(token) {
+      try {
+        const bytes = b64urlDecode(token);
+        if (bytes.length < 2) return null;
+        const ks = keyStream(hashKey(LINK_KEY), bytes.length);
+        const len = bytes[0] ^ ks[0];
+        if (len !== bytes.length - 1) return null;
+        const out = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          out[i] = bytes[i + 1] ^ ks[i + 1];
+        }
+        const text = new TextDecoder().decode(out);
+        return /^UNIT-[A-Z0-9]+$/.test(text) ? text : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
     // Load Unit Warga berdasarkan parameter URL
     function initUnitData() {
       const urlParams = new URLSearchParams(window.location.search);
-      const unitParam = urlParams.get('unit');
+      const tokenParam = urlParams.get('t');
+      let unitParam = urlParams.get('unit');
+      if (!unitParam && tokenParam) {
+        unitParam = decryptUnitParam(tokenParam);
+      }
       const blokParam = urlParams.get('blok');
       const noParam = urlParams.get('no');
       const namaParam = urlParams.get('nama');
@@ -447,9 +535,11 @@
         currentUnit = unitList.find(u => u.blok.toLowerCase() === blokParam.toLowerCase() && u.nomorRumah === noParam);
       }
 
-      // Jika belum ketemu, ambil unit pertama sebagai default sample demo
-      if (!currentUnit && unitList.length > 0) {
-        currentUnit = unitList[1] || unitList[0];
+      // Gerbang akses: tanpa token/parameter yang sah, jangan tampilkan data warga mana pun
+      const punyaParameter = !!(unitParam || (blokParam && noParam));
+      if (!punyaParameter || !currentUnit) {
+        tampilkanGerbang(tokenParam && !unitParam ? 'rusak' : 'tanpa-token');
+        return;
       }
 
       if (currentUnit) {
@@ -461,6 +551,24 @@
 
       updatePeriodeMultiBulan();
       renderRiwayatUnit();
+    }
+
+    // Tampilkan layar gerbang saat link tidak membawa token yang sah
+    function tampilkanGerbang(alasan) {
+      const konten = document.getElementById('konten-bayar');
+      const gerbang = document.getElementById('gerbang-token');
+      if (konten) konten.classList.add('hidden');
+      if (!gerbang) return;
+      gerbang.classList.remove('hidden');
+      const judul = document.getElementById('gerbang-judul');
+      const pesan = document.getElementById('gerbang-pesan');
+      if (alasan === 'rusak') {
+        if (judul) judul.textContent = 'Link pembayaran tidak valid';
+        if (pesan) pesan.textContent = 'Token pada link ini tidak dikenali. Minta ulang link pembayaran Anda kepada pengurus RT.';
+      } else {
+        if (judul) judul.textContent = 'Link pembayaran diperlukan';
+        if (pesan) pesan.textContent = 'Halaman ini hanya bisa dibuka melalui link pembayaran pribadi yang diberikan pengurus RT.';
+      }
     }
 
     // Render Riwayat Pembayaran Unit Ini & Kartu 12 Bulan

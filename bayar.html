@@ -60,6 +60,18 @@
   <!-- Main Container -->
   <main class="max-w-md mx-auto w-full p-4 flex-1 space-y-4">
 
+    <!-- Gerbang: tampil saat link tidak membawa token yang sah -->
+    <div id="gerbang-token" class="hidden bg-white rounded-3xl p-6 shadow-sm border border-slate-200 text-center space-y-3">
+      <div class="w-14 h-14 mx-auto rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+        <i data-lucide="lock" class="w-7 h-7"></i>
+      </div>
+      <h2 id="gerbang-judul" class="text-lg font-bold text-slate-800">Link pembayaran diperlukan</h2>
+      <p id="gerbang-pesan" class="text-sm text-slate-500 leading-relaxed">Halaman ini hanya bisa dibuka melalui link pembayaran pribadi yang diberikan pengurus RT.</p>
+      <p class="text-[11px] text-slate-400 pt-1">SIMWARGA &bull; Layanan Kependudukan &amp; Kas RT Mandiri</p>
+    </div>
+
+    <div id="konten-bayar" class="space-y-4">
+
     <!-- Card 1: Identitas Unit Rumah Hasil Scan QR Stiker -->
     <div class="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-3xl p-5 shadow-lg shadow-blue-500/15 relative overflow-hidden">
       <div class="relative z-10 space-y-3">
@@ -257,6 +269,8 @@
       <div id="container-riwayat-unit" class="space-y-2">
         <!-- Akan di-render otomatis via JS -->
       </div>
+    </div>
+
     </div>
 
   </main>
@@ -521,9 +535,11 @@
         currentUnit = unitList.find(u => u.blok.toLowerCase() === blokParam.toLowerCase() && u.nomorRumah === noParam);
       }
 
-      // Jika belum ketemu, ambil unit pertama sebagai default sample demo
-      if (!currentUnit && unitList.length > 0) {
-        currentUnit = unitList[1] || unitList[0];
+      // Gerbang akses: tanpa token/parameter yang sah, jangan tampilkan data warga mana pun
+      const punyaParameter = !!(unitParam || (blokParam && noParam));
+      if (!punyaParameter || !currentUnit) {
+        tampilkanGerbang(tokenParam && !unitParam ? 'rusak' : 'tanpa-token');
+        return;
       }
 
       if (currentUnit) {
@@ -535,6 +551,24 @@
 
       updatePeriodeMultiBulan();
       renderRiwayatUnit();
+    }
+
+    // Tampilkan layar gerbang saat link tidak membawa token yang sah
+    function tampilkanGerbang(alasan) {
+      const konten = document.getElementById('konten-bayar');
+      const gerbang = document.getElementById('gerbang-token');
+      if (konten) konten.classList.add('hidden');
+      if (!gerbang) return;
+      gerbang.classList.remove('hidden');
+      const judul = document.getElementById('gerbang-judul');
+      const pesan = document.getElementById('gerbang-pesan');
+      if (alasan === 'rusak') {
+        if (judul) judul.textContent = 'Link pembayaran tidak valid';
+        if (pesan) pesan.textContent = 'Token pada link ini tidak dikenali. Minta ulang link pembayaran Anda kepada pengurus RT.';
+      } else {
+        if (judul) judul.textContent = 'Link pembayaran diperlukan';
+        if (pesan) pesan.textContent = 'Halaman ini hanya bisa dibuka melalui link pembayaran pribadi yang diberikan pengurus RT.';
+      }
     }
 
     // Render Riwayat Pembayaran Unit Ini & Kartu 12 Bulan

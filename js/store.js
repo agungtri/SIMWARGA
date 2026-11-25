@@ -696,6 +696,80 @@ window.SimStore = {
     return item;
   },
 
+  // ===== Token Tautan Pembayaran =====
+  // Menyamarkan ID unit pada URL bayar.html agar tidak tampil di address bar
+  // dan tidak bisa dienumerasi dengan menebak. Kunci ikut terkirim ke browser
+  // karena situs statis, jadi ini penyamaran, bukan kerahasiaan sejati.
+  _linkKey: 'SIMWARGA-RT01-2026',
+
+  _hashKey(str) {
+    let h = 2166136261 >>> 0;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    return h >>> 0;
+  },
+
+  _keyStream(seed, len) {
+    let s = seed >>> 0;
+    const out = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      s ^= s << 13; s >>>= 0;
+      s ^= s >>> 17;
+      s ^= s << 5; s >>>= 0;
+      out[i] = s & 0xff;
+    }
+    return out;
+  },
+
+  _b64urlEncode(bytes) {
+    let bin = '';
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  },
+
+  _b64urlDecode(str) {
+    const pad = str.length % 4 === 0 ? '' : '='.repeat(4 - (str.length % 4));
+    const bin = atob(str.replace(/-/g, '+').replace(/_/g, '/') + pad);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  },
+
+  encryptUnitToken(unitId) {
+    const data = new TextEncoder().encode(String(unitId));
+    const ks = this._keyStream(this._hashKey(this._linkKey), data.length + 1);
+    const out = new Uint8Array(data.length + 1);
+    out[0] = data.length ^ ks[0];
+    for (let i = 0; i < data.length; i++) {
+      out[i + 1] = data[i] ^ ks[i + 1];
+    }
+    return this._b64urlEncode(out);
+  },
+
+  decryptUnitToken(token) {
+    try {
+      const bytes = this._b64urlDecode(token);
+      if (bytes.length < 2) return null;
+      const ks = this._keyStream(this._hashKey(this._linkKey), bytes.length);
+      const len = bytes[0] ^ ks[0];
+      if (len !== bytes.length - 1) return null;
+      const out = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        out[i] = bytes[i + 1] ^ ks[i + 1];
+      }
+      const text = new TextDecoder().decode(out);
+      return /^UNIT-[A-Z0-9]+$/.test(text) ? text : null;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  buildBayarUrl(unitId) {
+    return `bayar.html?t=${this.encryptUnitToken(unitId)}`;
+  },
+
   // Bukti Bayar Management
   getBuktiBayar() {
     return this._safeParse(STORAGE_KEYS.BUKTI_BAYAR, [...DEFAULT_BUKTI_BAYAR]);

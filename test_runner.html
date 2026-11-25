@@ -69,13 +69,21 @@
       // 2. UJI QR CODE PAYLOAD & PARAMETER RESOLUTION
       logSection('PENGUJIAN 2: URL Payload QR Stiker & Resolusi Parameter');
       const testUnitId = 'UNIT-A02';
-      const targetUrl = `bayar.html?unit=${encodeURIComponent(testUnitId)}`;
-      assert(targetUrl.includes('bayar.html?unit=UNIT-A02'), 'URL tujuan QR Stiker valid');
-      
+      const targetUrl = SimStore.buildBayarUrl(testUnitId);
+      assert(targetUrl.startsWith('bayar.html?t='), 'URL tujuan QR Stiker memakai token terenkripsi', `URL: ${targetUrl}`);
+      assert(!targetUrl.includes('UNIT-A02'), 'ID unit tidak lagi tampil pada URL QR Stiker');
+
       // Simulasi parser parameter di sisi bayar.html
-      const parsedParams = new URLSearchParams(`unit=${testUnitId}`);
-      const resolvedUnit = units.find(u => u.id === parsedParams.get('unit'));
-      assert(resolvedUnit && resolvedUnit.namaPenghuni === 'Hendra Wijaya', 'Sistem berhasil mengenali identitas rumah dari parameter QR tanpa login');
+      const parsedParams = new URLSearchParams(targetUrl.split('?')[1]);
+      const resolvedId = SimStore.decryptUnitToken(parsedParams.get('t'));
+      const resolvedUnit = units.find(u => u.id === resolvedId);
+      assert(resolvedUnit && resolvedUnit.namaPenghuni === 'Hendra Wijaya', 'Sistem berhasil mengenali identitas rumah dari token QR tanpa login');
+
+      // Token harus deterministik dan menolak masukan rusak
+      assert(SimStore.encryptUnitToken(testUnitId) === SimStore.encryptUnitToken(testUnitId), 'Token unit bersifat deterministik untuk unit yang sama');
+      assert(SimStore.decryptUnitToken('ZZZZZZZZZZZZ') === null, 'Token rusak ditolak dan tidak menghasilkan unit');
+      assert(SimStore.decryptUnitToken('') === null, 'Token kosong ditolak dan tidak menghasilkan unit');
+      assert(units.every(u => SimStore.decryptUnitToken(SimStore.encryptUnitToken(u.id)) === u.id), 'Semua unit dapat dienkripsi dan didekripsi kembali dengan benar');
 
       // 3. UJI HASHING ANTI-DUPLIKASI (SHA-256)
       logSection('PENGUJIAN 3: Hashing Kriptografis Anti-Duplikasi');

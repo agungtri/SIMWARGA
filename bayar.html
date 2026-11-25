@@ -345,12 +345,6 @@
         nominalInput.value = totalNominal;
       }
     }
-      navigator.clipboard.writeText(nomor).then(() => {
-        showToast('Nomor rekening berhasil disalin!');
-      }).catch(() => {
-        showToast('Salin manual: ' + nomor);
-      });
-    }
 
     // Trigger File Input
     function triggerFileInput() {

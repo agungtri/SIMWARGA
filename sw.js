@@ -3,7 +3,7 @@
  * Aktif hanya pada protokol HTTP/HTTPS (Mode Hosted Web).
  */
 
-const CACHE_NAME = 'simwarga-cache-v1.2';
+const CACHE_NAME = 'simwarga-cache-v1.3';
 const CORE_ASSETS = [
   './',
   './index.html',

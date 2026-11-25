@@ -1138,7 +1138,7 @@ function renderStikerGrid() {
 
   container.innerHTML = unitList.map(u => {
     const qrid = `qrcode-${u.id}`;
-    const payUrl = `bayar.html?unit=${encodeURIComponent(u.id)}`;
+    const payUrl = SimStore.buildBayarUrl(u.id);
 
     return `
       <div class="bg-white border-2 border-slate-300 rounded-3xl p-5 shadow-xs flex flex-col items-center text-center space-y-3 relative overflow-hidden">
@@ -1176,7 +1176,7 @@ function renderStikerGrid() {
       const el = document.getElementById(`qrcode-${u.id}`);
       if (el && window.QRCode) {
         el.innerHTML = '';
-        const fullUrl = `${window.location.href.split('index.html')[0]}bayar.html?unit=${encodeURIComponent(u.id)}`;
+        const fullUrl = `${window.location.href.split('index.html')[0]}${SimStore.buildBayarUrl(u.id)}`;
         new QRCode(el, {
           text: fullUrl,
           width: 110,
@@ -1222,7 +1222,7 @@ function triggerPrintStiker() {
   unitList.forEach(u => {
     const el = document.getElementById(`print-qr-${u.id}`);
     if (el && window.QRCode) {
-      const fullUrl = `${window.location.href.split('index.html')[0]}bayar.html?unit=${encodeURIComponent(u.id)}`;
+      const fullUrl = `${window.location.href.split('index.html')[0]}${SimStore.buildBayarUrl(u.id)}`;
       new QRCode(el, {
         text: fullUrl,
         width: 84,

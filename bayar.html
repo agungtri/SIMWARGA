@@ -27,6 +27,10 @@
 
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- PWA Web App Manifest -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#2563eb">
   
   <link rel="stylesheet" href="css/style.css">
 </head>
@@ -575,7 +579,12 @@
       SimStore.addBuktiBayar(newTrx);
       lastSubmittedTrx = newTrx;
 
-      showToast('Bukti pembayaran berhasil dikirim! Menunggu verifikasi pengurus RT.');
+      const isCloudReady = SimStore.isHostedMode() && SimStore.getCloudConfig().enabled;
+      if (isCloudReady) {
+        showToast('Bukti transfer berhasil dikirim & disinkronkan ke Cloud RT!');
+      } else {
+        showToast('Bukti pembayaran berhasil dikirim! Menunggu verifikasi pengurus RT.');
+      }
 
       // Tampilkan Tombol Notifikasi WA ke Bendahara
       const boxSukses = document.getElementById('box-sukses-wa');
@@ -602,6 +611,17 @@
       if (window.lucide) lucide.createIcons();
       initUnitData();
     });
+  </script>
+
+  <!-- Service Worker Registration for PWA (Protected for HTTP/HTTPS only) -->
+  <script>
+    if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(err => {
+          console.log('[PWA] Service Worker registration skipped:', err);
+        });
+      });
+    }
   </script>
 </body>
 </html>

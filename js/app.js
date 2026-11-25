@@ -835,16 +835,31 @@ function renderBuktiBayarTable() {
 }
 
 // Sinkronisasi Manual Bukti Transfer
-function syncBuktiBayarManual() {
+async function syncBuktiBayarManual() {
   const syncText = document.getElementById('sync-status-text');
   if (syncText) {
-    const timeNow = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    syncText.textContent = 'Menyinkronkan...';
+  }
+
+  if (SimStore.isHostedMode() && SimStore.getCloudConfig().enabled) {
+    const res = await SimStore.syncRemote();
+    if (res.success) {
+      showToast(`Sinkronisasi Cloud Berhasil! (${res.mergeCount || 0} data baru ditarik)`);
+    } else {
+      showToast(res.reason || res.error || 'Sinkronisasi lokal selesai', 'info');
+    }
+  } else {
+    showToast('Data bukti transfer warga diperbarui dari penyimpanan lokal!');
+  }
+
+  const timeNow = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  if (syncText) {
     syncText.textContent = `Tersinkron: ${timeNow}`;
   }
   renderBuktiBayarTable();
   renderKeuangan();
   renderDashboard();
-  showToast('Data bukti transfer warga berhasil diperbarui & disinkronkan!');
+  renderLaporanBlok();
 }
 
 // Modal Verifikasi Bukti
@@ -2087,6 +2102,95 @@ function renderSettings() {
   document.getElementById('set-ketua-rw').value = settings.namaKetuaRw || '';
   document.getElementById('set-iuran').value = settings.tarifIuranBulanan || 50000;
   document.getElementById('set-saldo-awal').value = settings.saldoAwal || 0;
+
+  // Cloud Sync Settings
+  const cloudConfig = SimStore.getCloudConfig();
+  const syncEnabledEl = document.getElementById('cloud-sync-enabled');
+  if (syncEnabledEl) syncEnabledEl.checked = !!cloudConfig.enabled;
+  const providerEl = document.getElementById('cloud-provider');
+  if (providerEl) providerEl.value = cloudConfig.provider || 'supabase';
+  const endpointEl = document.getElementById('cloud-endpoint-url');
+  if (endpointEl) endpointEl.value = cloudConfig.endpointUrl || '';
+  const apiKeyEl = document.getElementById('cloud-api-key');
+  if (apiKeyEl) apiKeyEl.value = cloudConfig.apiKey || '';
+  const tenantEl = document.getElementById('cloud-tenant-id');
+  if (tenantEl) tenantEl.value = cloudConfig.tenantId || 'KL-SUKAMAJU-RW07-RT03';
+  updateCloudSyncBadge();
+}
+
+function updateCloudSyncBadge() {
+  const badge = document.getElementById('cloud-status-badge');
+  if (!badge) return;
+  const config = SimStore.getCloudConfig();
+  const isHosted = SimStore.isHostedMode();
+
+  if (!isHosted) {
+    badge.className = 'px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200';
+    badge.textContent = 'Mode Lokal (file:///)';
+  } else if (!config.enabled) {
+    badge.className = 'px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200';
+    badge.textContent = 'Cloud Non-Aktif';
+  } else if (config.syncStatus === 'online') {
+    badge.className = 'px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200';
+    badge.textContent = 'Cloud Terhubung';
+  } else if (config.syncStatus === 'syncing') {
+    badge.className = 'px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 animate-pulse';
+    badge.textContent = 'Menyinkronkan...';
+  } else {
+    badge.className = 'px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200';
+    badge.textContent = 'Siap Sinkron';
+  }
+}
+
+async function handleTestCloudConnection() {
+  const resultEl = document.getElementById('cloud-test-result');
+  if (!resultEl) return;
+  resultEl.classList.remove('hidden', 'bg-emerald-50', 'text-emerald-700', 'border-emerald-200', 'bg-rose-50', 'text-rose-700', 'border-rose-200');
+  resultEl.classList.add('bg-blue-50', 'text-blue-700', 'border-blue-200');
+  resultEl.textContent = 'Menguji koneksi ke endpoint cloud...';
+
+  const testConfig = {
+    enabled: true,
+    provider: document.getElementById('cloud-provider').value,
+    endpointUrl: document.getElementById('cloud-endpoint-url').value.trim(),
+    apiKey: document.getElementById('cloud-api-key').value.trim(),
+    tenantId: document.getElementById('cloud-tenant-id').value.trim()
+  };
+
+  const res = await SimStore.testCloudConnection(testConfig);
+  resultEl.classList.remove('bg-blue-50', 'text-blue-700', 'border-blue-200');
+  if (res.ok) {
+    resultEl.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
+    resultEl.textContent = `✓ ${res.message}`;
+  } else {
+    resultEl.classList.add('bg-rose-50', 'text-rose-700', 'border-rose-200');
+    resultEl.textContent = `✕ ${res.message}`;
+  }
+}
+
+async function handleSaveCloudConfig() {
+  const config = {
+    enabled: document.getElementById('cloud-sync-enabled').checked,
+    provider: document.getElementById('cloud-provider').value,
+    endpointUrl: document.getElementById('cloud-endpoint-url').value.trim(),
+    apiKey: document.getElementById('cloud-api-key').value.trim(),
+    tenantId: document.getElementById('cloud-tenant-id').value.trim()
+  };
+  SimStore.saveCloudConfig(config);
+  updateCloudSyncBadge();
+  showToast('Pengaturan Cloud Sync berhasil disimpan!');
+
+  if (config.enabled && config.endpointUrl) {
+    showToast('Memulai sinkronisasi data cloud...');
+    const res = await SimStore.syncRemote();
+    if (res.success) {
+      showToast(`Sinkronisasi selesai! ${res.mergeCount || 0} bukti transfer diperbarui.`);
+      renderBuktiBayarTable();
+      renderDashboard();
+    } else {
+      showToast(res.error || 'Gagal menyinkronkan data cloud.', 'error');
+    }
+  }
 }
 
 function handleSaveSettings(event) {
@@ -2246,5 +2350,32 @@ document.addEventListener('DOMContentLoaded', () => {
       sidebar.classList.toggle('-translate-x-full');
     });
   }
+
+  // Inisialisasi Runtime Mode Badge (Hosted Web vs Standalone)
+  const badgeRuntimeDot = document.getElementById('badge-runtime-dot');
+  const badgeRuntimeText = document.getElementById('badge-runtime-text');
+  const badgeRuntimeMode = document.getElementById('badge-runtime-mode');
+  if (badgeRuntimeMode && badgeRuntimeDot && badgeRuntimeText) {
+    if (SimStore.isHostedMode()) {
+      badgeRuntimeDot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+      badgeRuntimeText.textContent = 'Mode Hosted Web';
+      badgeRuntimeMode.className = 'hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200';
+    } else {
+      badgeRuntimeDot.className = 'w-2 h-2 rounded-full bg-slate-400';
+      badgeRuntimeText.textContent = 'Mode Standalone (file:///)';
+      badgeRuntimeMode.className = 'hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200';
+    }
+  }
+
+  // Listener event sinkronisasi cloud
+  window.addEventListener('simwarga:synced', () => {
+    const syncText = document.getElementById('sync-status-text');
+    if (syncText) {
+      const timeNow = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      syncText.textContent = `Tersinkron: ${timeNow}`;
+    }
+    renderBuktiBayarTable();
+    renderDashboard();
+  });
 });
 

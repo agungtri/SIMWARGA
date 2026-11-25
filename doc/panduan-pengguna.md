@@ -136,7 +136,9 @@ Pada sub-tab **"Buku Kas Umum"**, bendahara dapat melihat 2 kantong saldo terpis
 ## 4. Tanya Jawab Umum (FAQ)
 
 ### Q1: Apakah aplikasi ini membutuhkan koneksi internet?
-> **Jawab:** Aplikasi ini berjalan langsung di peramban komputer/HP Anda. Untuk pencatatan sehari-hari bisa dijalankan secara offline. Koneksi internet hanya dibutuhkan saat pertama kali memuat ikon dan tampilan.
+> **Jawab:** SIMWARGA mendukung **Dual-Mode**:
+> 1. **Mode Standalone (Luring / file:///):** Aplikasi dapat dibuka langsung tanpa server/internet untuk keperluan pencatatan mandiri bendahara.
+> 2. **Mode Hosted Web (Online / PWA):** Ketika di-deploy ke hosting web statis (Cloudflare Pages / GitHub Pages), warga dapat mengakses portal bayar dari HP di mana saja. Data struk otomatis disinkronkan ke server cloud RT, dan pengurus dapat menginstal aplikasi ke layar utama HP (*Add to Home Screen*) dengan kemampuan kerja saat jaringan terputus (*offline-first*).
 
 ### Q2: Bagaimana jika warga salah mengirim struk atau gambarnya buram?
 > **Jawab:** Pada saat bendahara meninjau bukti bayar, klik tombol merah **"✕ Tolak Bukti"**, lalu ketikkan alasannya (contoh: *"Gambar buram, mohon foto ulang"*). Warga dapat mengunggah kembali foto struk yang benar.

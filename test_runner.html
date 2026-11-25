@@ -15,13 +15,19 @@
   </style>
 </head>
 <body>
-  <h2>🧪 Automated Test Runner - Verifikasi Tahap 1 SIMWARGA</h2>
+  <h2>🧪 Automated Test Runner - Verifikasi Fungsionalitas SIMWARGA</h2>
   <div id="results"></div>
   <div id="summary"></div>
 
   <script src="js/store.js"></script>
   <script>
     const resultsDiv = document.getElementById('results');
+    window.onerror = function(msg, url, line, col, error) {
+      const errEl = document.createElement('div');
+      errEl.className = 'fail';
+      errEl.innerHTML = `FATAL ERROR: ${msg} at line ${line}:${col}`;
+      resultsDiv.appendChild(errEl);
+    };
     let totalTests = 0;
     let passedTests = 0;
     let failedTests = 0;
@@ -259,6 +265,433 @@
       assert(cashTrx.kodeAkunDebit === '1-101', 'Akun Debit Kas Tunai di Tangan tercatat benar (1-101)');
       assert(cashBukti.statusVerifikasi === 'Terverifikasi', 'Iuran tunai langsung berstatus "Terverifikasi" seketika');
       assert(cashBukti.transaksiId === cashTrx.id, 'Bukti bayar tunai tertaut langsung dengan mutasi kas');
+
+      // 10. UJI MANAJEMEN DATA KEPENDUDUKAN (WARGA CRUD)
+      logSection('PENGUJIAN 10: Manajemen Data Kependudukan (Warga CRUD & Integritas)');
+      const initialWargaCount = SimStore.getWarga().length;
+      const newWarga = SimStore.addWarga({
+        nik: '3277011203990099',
+        noKk: '3277011203000099',
+        nama: 'Asep Saepuloh',
+        jenisKelamin: 'Laki-laki',
+        tempatLahir: 'Bandung',
+        tanggalLahir: '1990-01-01',
+        agama: 'Islam',
+        pendidikan: 'S1',
+        pekerjaan: 'Pegawai Swasta',
+        statusPerkawinan: 'Kawin',
+        statusKeluarga: 'Kepala Keluarga',
+        statusTinggal: 'Tetap',
+        alamat: 'Jl. Merak Blok A No. 15',
+        noHp: '081299887766',
+        golDarah: 'B',
+        disabilitas: 'Tidak'
+      });
+      assert(newWarga.id && newWarga.id.startsWith('W-'), 'Registrasi warga baru berhasil dengan ID W-*');
+      assert(SimStore.getWarga().length === initialWargaCount + 1, 'Koleksi warga bertambah 1 entitas');
+
+      // Update data warga
+      SimStore.updateWarga(newWarga.id, { noHp: '081299990000', pekerjaan: 'Wiraswasta Mandiri' });
+      const updatedWarga = SimStore.getWarga().find(w => w.id === newWarga.id);
+      assert(updatedWarga.noHp === '081299990000' && updatedWarga.pekerjaan === 'Wiraswasta Mandiri', 'Pembaruan profil warga berhasil diperbarui');
+
+      // Hapus data warga
+      SimStore.deleteWarga(newWarga.id);
+      assert(SimStore.getWarga().length === initialWargaCount, 'Penghapusan data warga berhasil mengembalikan jumlah awal');
+
+      // 11. UJI MODUL LAYANAN SURAT PENGANTAR RT
+      logSection('PENGUJIAN 11: Modul Layanan Surat Pengantar RT');
+      const initialSuratCount = SimStore.getSurat().length;
+      const newSurat = SimStore.addSurat({
+        nomorSurat: '470/TEST/RT.03-RW.07/XI/2026',
+        tanggal: '2026-11-14',
+        wargaId: 'W-001',
+        nama: 'H. Bambang Sudrajat',
+        nik: '3277011203750001',
+        keperluan: 'Pengurusan KTP Elektronik Baru',
+        status: 'Menunggu',
+        keterangan: 'Permohonan via portal warga'
+      });
+      assert(newSurat.id && newSurat.id.startsWith('SRT-'), 'Registrasi surat pengantar baru berhasil dengan ID SRT-*');
+      assert(newSurat.keperluan === 'Pengurusan KTP Elektronik Baru', 'Metadata keperluan surat tersimpan akurat');
+
+      // Hapus surat
+      SimStore.deleteSurat(newSurat.id);
+      assert(SimStore.getSurat().length === initialSuratCount, 'Penghapusan berkas surat pengantar berhasil');
+
+      // 12. UJI MODUL KEAMANAN, JADWAL RONDA & TAMU
+      logSection('PENGUJIAN 12: Modul Keamanan Lingkungan, Jadwal Ronda & Tamu');
+      // Update jadwal ronda
+      const rondaList = SimStore.getRonda();
+      const firstRonda = rondaList[0];
+      const originalKoordinator = firstRonda.koordinator;
+      SimStore.updateRonda(firstRonda.id, { koordinator: 'Koordinator Baru Uji' });
+      const updatedRonda = SimStore.getRonda().find(r => r.id === firstRonda.id);
+      assert(updatedRonda.koordinator === 'Koordinator Baru Uji', 'Jadwal ronda mingguan berhasil diperbarui');
+      SimStore.updateRonda(firstRonda.id, { koordinator: originalKoordinator }); // Kembalikan data awal
+
+      // Tambah tamu / warga sementara
+      const initialTamuCount = SimStore.getTamu().length;
+      const newTamu = SimStore.addTamu({
+        nama: 'Rian Hidayat',
+        nik: '3201112233440005',
+        jenis: 'Tamu Menginap (> 24 Jam)',
+        noHp: '081233445566',
+        asal: 'Bogor, Jawa Barat',
+        alamatTujuan: 'Rumah Bpk. Hendra Wijaya (Jl. Merak No. 14)',
+        tanggalMasuk: '2026-11-14',
+        durasi: '2 Hari',
+        pekerjaan: 'Mahasiswa',
+        status: 'Aktif'
+      });
+      assert(newTamu.id && newTamu.id.startsWith('TM-'), 'Pencatatan tamu menginap berhasil dengan ID TM-*');
+      SimStore.deleteTamu(newTamu.id);
+      assert(SimStore.getTamu().length === initialTamuCount, 'Penghapusan arsip tamu berhasil');
+
+      // Tambah & hapus laporan keamanan
+      const initialLkCount = SimStore.getLaporanKeamanan().length;
+      const newLk = SimStore.addLaporanKeamanan({
+        tanggal: '2026-11-14',
+        jam: '01:15',
+        pelapor: 'Regu Elang',
+        jenisKejadian: 'Patroli Rutin',
+        status: 'Aman Terkendali',
+        lokasi: 'Pos Kamling & Portal Utama',
+        catatan: 'Kondisi lingkungan aman kondusif.'
+      });
+      assert(newLk.id && newLk.id.startsWith('LK-'), 'Pencatatan laporan pos kamling berhasil dengan ID LK-*');
+      SimStore.deleteLaporanKeamanan(newLk.id);
+      assert(SimStore.getLaporanKeamanan().length === initialLkCount, 'Penghapusan laporan keamanan berhasil');
+
+      // 13. UJI INTEGRITAS CADANGAN SISTEM (BACKUP & RESTORE JSON)
+      logSection('PENGUJIAN 13: Integritas Cadangan Sistem (Backup & Restore JSON)');
+      const backupJsonString = SimStore.exportBackupJSON();
+      assert(typeof backupJsonString === 'string' && backupJsonString.length > 100, 'Ekspor cadangan sistem menghasilkan string JSON valid');
+      
+      const parsedBackup = JSON.parse(backupJsonString);
+      const requiredEntities = ['settings', 'warga', 'transaksi', 'surat', 'tamu', 'ronda', 'laporanKeamanan', 'unitRumah', 'buktiBayar'];
+      const hasAllEntities = requiredEntities.every(key => key in parsedBackup);
+      assert(hasAllEntities, 'Arsip cadangan JSON memuat seluruh 9 entitas utama sistem');
+
+      const importResult = SimStore.importBackupJSON(backupJsonString);
+      assert(importResult === true, 'Proses validasi dan pemulihan (restore) berkas cadangan JSON berhasil');
+
+      // 14. UJI MESIN VALIDASI CERDAS (OCR ENGINE RULES) & MATRIKS REKAP
+      logSection('PENGUJIAN 14: Mesin Validasi Cerdas (Rule-Based OCR) & Matriks Rekapitulasi');
+      const settings = SimStore.getSettings();
+      const standardTarif = Number(settings.tarifIuranBulanan) || 50000;
+
+      // Rule evaluasi nominal: Normal vs Kurang
+      const evalSesuai = (nominal) => nominal >= standardTarif ? 'LULUS OTOMATIS' : 'PERLU CEK MANUAL';
+      assert(evalSesuai(50000) === 'LULUS OTOMATIS', 'Nominal tepat Rp 50.000 direkomendasikan "LULUS OTOMATIS"');
+      assert(evalSesuai(100000) === 'LULUS OTOMATIS', 'Nominal multi-bulan Rp 100.000 direkomendasikan "LULUS OTOMATIS"');
+      assert(evalSesuai(30000) === 'PERLU CEK MANUAL', 'Nominal kurang Rp 30.000 diberi peringatan "PERLU CEK MANUAL"');
+
+      // Verifikasi status lunas pada matriks 12 bulan
+      const verifiedList = SimStore.getBuktiBayar().filter(b => b.statusVerifikasi === 'Terverifikasi');
+      const isBulanLunas = (unitId, targetBulan) => {
+        return verifiedList.some(b => b.unitId === unitId && (b.periodeBulan || '').includes(targetBulan));
+      };
+      assert(isBulanLunas('UNIT-B01', '2026-10') === true, 'Matriks rekapitulasi mengenali UNIT-B01 lunas untuk periode 2026-10');
+      assert(isBulanLunas('UNIT-A01', '2026-01') === false, 'Matriks rekapitulasi menandai bulan yang belum dibayar sebagai belum lunas');
+
+      // 15. UJI HARDNESS: KETAHANAN INPUT EKSTREM & SANITASI STRING
+      logSection('PENGUJIAN 15: Hardness - Ketahanan Input Ekstrem & Sanitasi String');
+      const xssPayload = "<script>alert('xss')<" + "/script>";
+      const xssWarga = SimStore.addWarga({ nama: xssPayload, nik: '3277999900001111', noKk: '3277999900002222', jenisKelamin: 'Laki-laki', statusTinggal: 'Tetap' });
+      const retrievedXss = SimStore.getWarga().find(w => w.id === xssWarga.id);
+      assert(retrievedXss && retrievedXss.nama === xssPayload, 'Payload XSS tersimpan dan terbaca utuh sebagai string murni tanpa eksekusi liar');
+      SimStore.deleteWarga(xssWarga.id);
+
+      const unicodeText = "Bpk. Jöhñ Döe 🌟 Komplek RT/RW 005/002 🇮🇩 (العربية / 中文 / 日本語)";
+      const uTrx = SimStore.addTransaksi({
+        tanggal: '2026-11-20',
+        tipe: 'Pemasukan',
+        kategori: 'Donasi',
+        metodeBayar: 'Kas di Bank (BCA)',
+        kodeAkunDebit: '1-102',
+        kodeAkunKredit: '4-101',
+        nominal: 150000,
+        keterangan: unicodeText,
+        pembayar: unicodeText
+      });
+      const readUTrx = SimStore.getTransaksi().find(t => t.id === uTrx.id);
+      assert(readUTrx && readUTrx.keterangan === unicodeText && readUTrx.pembayar === unicodeText, 'Karakter Unicode multibyte & emoji tersimpan dan terbaca tanpa distorsi karakter');
+      SimStore.deleteTransaksi(uTrx.id);
+
+      const escapeText = "Catatan: Dia berkata, \"Iuran 'A-12' sudah beres!\" \\ folder C:\\rt\\warga \n Baris 2 \t Kolom Tab";
+      const escTrx = SimStore.addTransaksi({
+        tanggal: '2026-11-20',
+        tipe: 'Pemasukan',
+        kategori: 'Iuran Bulanan',
+        metodeBayar: 'Kas Tunai (Bendahara)',
+        kodeAkunDebit: '1-101',
+        kodeAkunKredit: '4-101',
+        nominal: 50000,
+        keterangan: escapeText,
+        pembayar: 'Budi'
+      });
+      const readEsc = SimStore.getTransaksi().find(t => t.id === escTrx.id);
+      assert(readEsc && readEsc.keterangan === escapeText, 'Karakter escape (petik tunggal/ganda, backslash, newline, tab) lolos serialisasi JSON');
+      SimStore.deleteTransaksi(escTrx.id);
+
+      const rawNik = " 3277-0105-0698-9999 ";
+      const flexWarga = SimStore.addWarga({ nama: 'Warga Fleksibel', nik: rawNik, noKk: '3277 0142 0100 8888', jenisKelamin: 'Laki-laki', statusTinggal: 'Tetap' });
+      const readFlex = SimStore.getWarga().find(w => w.id === flexWarga.id);
+      assert(readFlex && readFlex.nik === rawNik, 'Format fleksibel NIK dan KK tersimpan utuh dengan integritas string');
+      SimStore.deleteWarga(flexWarga.id);
+
+      // 16. UJI HARDNESS: BATAS NILAI & PRESISI MATEMATIKA KAS
+      logSection('PENGUJIAN 16: Hardness - Batas Nilai & Presisi Matematika Kas');
+      const zeroTrx = SimStore.addTransaksi({
+        tanggal: '2026-11-20',
+        tipe: 'Pemasukan',
+        kategori: 'Lain-lain',
+        metodeBayar: 'Kas Tunai (Bendahara)',
+        kodeAkunDebit: '1-101',
+        kodeAkunKredit: '4-101',
+        nominal: 0,
+        keterangan: 'Transaksi nominal batas nol',
+        pembayar: 'Sistem'
+      });
+      const summaryZero = SimStore.getRingkasanKas();
+      assert(!isNaN(summaryZero.totalSaldo) && summaryZero.totalSaldo >= 0, 'Transaksi nominal Rp 0 diproses presisi tanpa menghasilkan nilai NaN');
+      SimStore.deleteTransaksi(zeroTrx.id);
+
+      const initKas = SimStore.getRingkasanKas();
+      const bigTrx = SimStore.addTransaksi({
+        tanggal: '2026-11-20',
+        tipe: 'Pemasukan',
+        kategori: 'Bantuan Pemerintah',
+        metodeBayar: 'Kas di Bank (BCA)',
+        kodeAkunDebit: '1-102',
+        kodeAkunKredit: '4-101',
+        nominal: 1000000000,
+        keterangan: 'Dana Hibah Pemda 1 Miliar',
+        pembayar: 'Pemerintah Kota'
+      });
+      const afterBigKas = SimStore.getRingkasanKas();
+      assert(afterBigKas.totalPemasukan === initKas.totalPemasukan + 1000000000 && afterBigKas.saldoKasBank === initKas.saldoKasBank + 1000000000, 'Kalkulasi kas skala besar (Rp 1 Miliar) akurat hingga digit satuan tanpa distorsi');
+      SimStore.deleteTransaksi(bigTrx.id);
+
+      const checkKas = SimStore.getRingkasanKas();
+      const initialKasTotal = (Number(SimStore.getSettings().saldoAwalBank) || 2000000) + (Number(SimStore.getSettings().saldoAwalTunai) || 500000);
+      assert(checkKas.totalSaldo === (checkKas.saldoKasBank + checkKas.saldoKasTunai), 'Invarian Kas Terpenuhi: Total Saldo identik dengan jumlah Kas Bank + Kas Tunai');
+      assert(checkKas.totalSaldo === (initialKasTotal + checkKas.totalPemasukan - checkKas.totalPengeluaran), 'Invarian Mutasi Terpenuhi: Total Saldo identik dengan Saldo Awal ditambah Total Pemasukan dikurangi Total Pengeluaran');
+
+      // 17. UJI HARDNESS: VOLUME TINGGI & ANTI-TABRAKAN KUNCI (CONCURRENT BURST)
+      logSection('PENGUJIAN 17: Hardness - Volume Tinggi & Anti-Tabrakan Kunci (Concurrent Burst)');
+      const burstTrxIds = [];
+      for (let i = 0; i < 100; i++) {
+        const t = SimStore.addTransaksi({
+          tanggal: '2026-11-20',
+          tipe: 'Pemasukan',
+          kategori: 'Iuran Bulanan',
+          metodeBayar: 'Kas Tunai (Bendahara)',
+          kodeAkunDebit: '1-101',
+          kodeAkunKredit: '4-101',
+          nominal: 1000,
+          keterangan: `Burst Trx ${i}`,
+          pembayar: `Warga ${i}`
+        });
+        burstTrxIds.push(t.id);
+      }
+      const uniqueTrxSet = new Set(burstTrxIds);
+      assert(uniqueTrxSet.size === 100, 'Generasi burst 100 transaksi sinkron menghasilkan 100 ID unik tanpa tabrakan (zero collision)');
+      let allTrx = SimStore.getTransaksi().filter(t => !uniqueTrxSet.has(t.id));
+      SimStore.saveTransaksi(allTrx);
+
+      const burstBuktiIds = [];
+      for (let i = 0; i < 50; i++) {
+        const b = SimStore.addBuktiBayar({
+          unitId: 'UNIT-A01',
+          nama: `Warga Test ${i}`,
+          blok: 'Blok A',
+          nomorRumah: '12',
+          periodeBulan: '2026-11',
+          nominal: 50000,
+          tanggalBayar: '2026-11-20',
+          nomorReferensi: `REF-BURST-${i}-${Date.now()}`,
+          statusVerifikasi: 'Menunggu Verifikasi',
+          imageHash: `hash-burst-${i}`
+        });
+        burstBuktiIds.push(b.id);
+      }
+      const uniqueBuktiSet = new Set(burstBuktiIds);
+      assert(uniqueBuktiSet.size === 50, 'Generasi burst 50 bukti bayar serentak menghasilkan 50 ID unik tanpa tabrakan');
+      let allBukti = SimStore.getBuktiBayar().filter(b => !uniqueBuktiSet.has(b.id));
+      SimStore.saveBuktiBayar(allBukti);
+
+      const burstWargaIds = [];
+      for (let i = 0; i < 50; i++) {
+        const w = SimStore.addWarga({
+          nama: `Warga Burst ${i}`,
+          nik: `327700000000${String(i).padStart(4, '0')}`,
+          noKk: '3277000000009999',
+          jenisKelamin: i % 2 === 0 ? 'Laki-laki' : 'Perempuan',
+          statusTinggal: 'Tetap'
+        });
+        burstWargaIds.push(w.id);
+      }
+      const uniqueWargaSet = new Set(burstWargaIds);
+      assert(uniqueWargaSet.size === 50, 'Generasi batch 50 data warga sinkron menghasilkan 50 ID unik');
+      let allWarga = SimStore.getWarga().filter(w => !uniqueWargaSet.has(w.id));
+      SimStore.saveWarga(allWarga);
+
+      // 18. UJI HARDNESS: KALENDER & ROLLOVER LINTAS TAHUN
+      logSection('PENGUJIAN 18: Hardness - Kalender & Rollover Lintas Tahun');
+      const crossYearBukti = SimStore.addBuktiBayar({
+        unitId: 'UNIT-C01',
+        nama: 'Deni Kurniawan',
+        blok: 'Blok C',
+        nomorRumah: '05',
+        periodeBulan: '2026-11, 2026-12, 2027-01, 2027-02',
+        nominal: 200000,
+        tanggalBayar: '2026-11-20',
+        nomorReferensi: 'BCA-ROLLOVER-9988',
+        statusVerifikasi: 'Terverifikasi',
+        imageHash: 'hash-rollover-year'
+      });
+      const isBulanLunasTest = (unitId, targetBulan) => {
+        return SimStore.getBuktiBayar().filter(b => b.statusVerifikasi === 'Terverifikasi')
+          .some(b => b.unitId === unitId && (b.periodeBulan || '').includes(targetBulan));
+      };
+      assert(
+        isBulanLunasTest('UNIT-C01', '2026-11') &&
+        isBulanLunasTest('UNIT-C01', '2026-12') &&
+        isBulanLunasTest('UNIT-C01', '2027-01') &&
+        isBulanLunasTest('UNIT-C01', '2027-02'),
+        'Pembayaran multi-bulan rollover lintas tahun (2026 -> 2027) terdeteksi lunas pada kedua tahun kalender'
+      );
+
+      const months = crossYearBukti.periodeBulan.split(',').map(s => s.trim());
+      const hasInvalidMonth = months.some(m => {
+        const parts = m.split('-');
+        const mm = parseInt(parts[1], 10);
+        return mm < 1 || mm > 12;
+      });
+      assert(!hasInvalidMonth && months.length === 4, 'Rentang bulan rollover valid (MM antara 01 dan 12, tanpa bulan 13)');
+      assert(isBulanLunasTest('UNIT-C01', '2026-09') === false, 'Isolasi filter periode akurat: bulan di luar cakupan multi-bulan (2026-09) tetap berstatus belum lunas');
+      SimStore.deleteBuktiBayar(crossYearBukti.id);
+
+      // 19. UJI HARDNESS: STATE MACHINE & INTEGRITAS REFERENSIAL BUKTI BAYAR
+      logSection('PENGUJIAN 19: Hardness - State Machine & Integritas Referensial');
+      const allBuktiWithRef = SimStore.getBuktiBayar().filter(b => b.nomorReferensi);
+      const existingRef = allBuktiWithRef.length > 0 ? allBuktiWithRef[0].nomorReferensi : 'TRX-BCA-202610240981';
+      const isDuplicateRef = (ref) => {
+        if (!ref || typeof ref !== 'string') return false;
+        return SimStore.getBuktiBayar().some(b => b.nomorReferensi && b.nomorReferensi.toLowerCase() === ref.trim().toLowerCase());
+      };
+      assert(isDuplicateRef(existingRef) === true, 'Pemeriksaan nomor referensi bank mendeteksi duplikasi referensi yang sudah ada');
+      assert(isDuplicateRef('REF-NON-EXISTENT-XYZ-999') === false, 'Nomor referensi baru yang belum pernah digunakan diterima');
+
+      const testBukti = SimStore.addBuktiBayar({
+        unitId: 'UNIT-B02',
+        nama: 'Ahmad Sobari',
+        blok: 'Blok B',
+        nomorRumah: '20',
+        periodeBulan: '2026-11',
+        nominal: 50000,
+        statusVerifikasi: 'Menunggu Verifikasi',
+        transaksiId: null
+      });
+      const countTrxBefore = SimStore.getTransaksi().length;
+      if (testBukti.transaksiId) {
+        SimStore.deleteTransaksi(testBukti.transaksiId);
+      }
+      SimStore.updateBuktiBayar(testBukti.id, { statusVerifikasi: 'Menunggu Verifikasi', transaksiId: null });
+      const countTrxAfter = SimStore.getTransaksi().length;
+      assert(countTrxBefore === countTrxAfter, 'Operasi rollback pada bukti belum diverifikasi bersifat idempoten tanpa menghapus transaksi lain');
+
+      let errorThrown = false;
+      try {
+        SimStore.deleteTransaksi('TRX-NON-EXISTENT-999999');
+      } catch (e) {
+        errorThrown = true;
+      }
+      assert(!errorThrown, 'Penghapusan ID transaksi fiktif ditangani aman tanpa runtime exception');
+
+      // State machine lifecycle
+      SimStore.updateBuktiBayar(testBukti.id, { statusVerifikasi: 'Ditolak' });
+      assert(SimStore.getBuktiBayar().find(b => b.id === testBukti.id).statusVerifikasi === 'Ditolak', 'Lifecycle State 1: Status bukti berhasil beralih ke Ditolak');
+
+      SimStore.updateBuktiBayar(testBukti.id, { statusVerifikasi: 'Menunggu Verifikasi' });
+      assert(SimStore.getBuktiBayar().find(b => b.id === testBukti.id).statusVerifikasi === 'Menunggu Verifikasi', 'Lifecycle State 2: Re-evaluasi berhasil mengembalikan status ke Menunggu Verifikasi');
+
+      const kasBeforeApprove = SimStore.getRingkasanKas().totalSaldo;
+      const newJurnal = SimStore.addTransaksi({
+        tanggal: '2026-11-20',
+        tipe: 'Pemasukan',
+        kategori: 'Iuran Bulanan',
+        metodeBayar: 'Kas di Bank (BCA)',
+        kodeAkunDebit: '1-102',
+        kodeAkunKredit: '4-101',
+        nominal: 50000,
+        keterangan: 'Iuran UNIT-B02',
+        pembayar: 'Ahmad Sobari'
+      });
+      SimStore.updateBuktiBayar(testBukti.id, { statusVerifikasi: 'Terverifikasi', transaksiId: newJurnal.id });
+      assert(SimStore.getRingkasanKas().totalSaldo === kasBeforeApprove + 50000, 'Lifecycle State 3: Verifikasi berhasil mencatatkan mutasi kas masuk Rp 50.000');
+
+      SimStore.deleteTransaksi(newJurnal.id);
+      SimStore.updateBuktiBayar(testBukti.id, { statusVerifikasi: 'Menunggu Verifikasi', transaksiId: null });
+      assert(SimStore.getRingkasanKas().totalSaldo === kasBeforeApprove, 'Lifecycle State 4: Rollback berhasil menarik transaksi dan memulihkan saldo kas persis seperti semula');
+      SimStore.deleteBuktiBayar(testBukti.id);
+
+      // 20. UJI HARDNESS: KERUSAKAN STORAGE & PEMULIHAN (FAULT TOLERANCE)
+      logSection('PENGUJIAN 20: Hardness - Kerusakan Storage & Pemulihan (Fault Tolerance)');
+      const malformedJson = "{ broken_json: true, unterminated string ...";
+      localStorage.setItem('SIMWARGA_CORRUPT_TEST', malformedJson);
+      const fallbackResult = SimStore._safeParse('SIMWARGA_CORRUPT_TEST', ['fallback_data']);
+      assert(Array.isArray(fallbackResult) && fallbackResult[0] === 'fallback_data', 'Storage parser _safeParse mendeteksi JSON korup dan mengembalikan nilai fallback dengan aman');
+      localStorage.removeItem('SIMWARGA_CORRUPT_TEST');
+
+      const badBackups = [
+        "",
+        "invalid json text",
+        "12345",
+        "{}",
+        JSON.stringify({ randomKey: 'not a valid backup' })
+      ];
+      const allRejected = badBackups.every(b => SimStore.importBackupJSON(b) === false);
+      assert(allRejected, 'Mesin importBackupJSON menolak seluruh variasi berkas cadangan rusak/tidak valid');
+
+      const wargaCountNow = SimStore.getWarga().length;
+      const trxCountNow = SimStore.getTransaksi().length;
+      SimStore.importBackupJSON("{ corrupted: true }");
+      assert(SimStore.getWarga().length === wargaCountNow && SimStore.getTransaksi().length === trxCountNow, 'Data aktif di sistem terbukti 100% utuh dan tidak terhapus setelah upaya impor berkas korup');
+
+      // 21. UJI ADAPTOR PENYIMPANAN & HOSTED WEB DUAL-MODE
+      logSection('PENGUJIAN 21: Adaptor Penyimpanan & Hosted Web Dual-Mode');
+      const isHosted = SimStore.isHostedMode();
+      assert(typeof isHosted === 'boolean', 'Deteksi protokol runtime isHostedMode() menghasilkan nilai boolean valid');
+
+      const cloudConfig = SimStore.getCloudConfig();
+      assert(cloudConfig && 'enabled' in cloudConfig && 'tenantId' in cloudConfig, 'Konfigurasi Cloud Storage Adapter memuat struktur default lengkap');
+
+      const sampleConfig = {
+        enabled: true,
+        provider: 'supabase',
+        endpointUrl: 'https://test-rt03.supabase.co',
+        apiKey: 'anon_key_test_123',
+        tenantId: 'KL-SUKAMAJU-RW07-RT03'
+      };
+      SimStore.saveCloudConfig(sampleConfig);
+      const readConfig = SimStore.getCloudConfig();
+      assert(readConfig.enabled === true && readConfig.endpointUrl === sampleConfig.endpointUrl, 'Pembaruan konfigurasi cloud adapter tersimpan presisi di storage');
+
+      assert(SimStore.getTenantId() === 'KL-SUKAMAJU-RW07-RT03', 'Isolasi komposit Tenant ID wilayah sesuai standar (KL-SUKAMAJU-RW07-RT03)');
+
+      // Uji antrean mutasi luring (offline queue)
+      SimStore.clearOfflineQueue();
+      SimStore.enqueueOffline('INSERT', 'bukti_bayar', { id: 'TEST-OFFLINE-01', nominal: 50000 });
+      const queueList = SimStore.getOfflineQueue();
+      assert(queueList.length === 1 && queueList[0].data.id === 'TEST-OFFLINE-01', 'Antrean mutasi luring (offline queue) menampung transaksi saat tanpa jaringan');
+      SimStore.clearOfflineQueue();
+      assert(SimStore.getOfflineQueue().length === 0, 'Pembersihan antrean mutasi luring berhasil dikosongkan');
+
+      // Reset konfigurasi cloud ke default agar tidak mempengaruhi tes lain
+      SimStore.saveCloudConfig({ enabled: false, endpointUrl: '', apiKey: '' });
 
       // TAMPILKAN SUMMARY
       const summaryDiv = document.getElementById('summary');

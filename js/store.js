@@ -12,7 +12,95 @@ const STORAGE_KEYS = {
   RONDA: 'simwarga_ronda',
   LAPORAN_KEAMANAN: 'simwarga_laporan_keamanan',
   BUKTI_BAYAR: 'simwarga_bukti_bayar',
-  UNIT_RUMAH: 'simwarga_unit_rumah'
+  UNIT_RUMAH: 'simwarga_unit_rumah',
+  CLOUD_CONFIG: 'simwarga_cloud_config',
+  OFFLINE_QUEUE: 'simwarga_offline_queue'
+};
+
+// Konfigurasi Bawaan Cloud Sync (Mode Hosted Web)
+const DEFAULT_CLOUD_CONFIG = {
+  enabled: false,
+  provider: 'supabase', // 'supabase' | 'rest' | 'custom'
+  endpointUrl: '',
+  apiKey: '',
+  tenantId: 'KL-SUKAMAJU-RW07-RT03',
+  lastSyncTime: null,
+  syncStatus: 'idle' // 'idle' | 'syncing' | 'online' | 'offline' | 'error'
+};
+
+// Storage Adapter: RemoteSyncAdapter untuk Hosted Web & BaaS Sync
+const RemoteSyncAdapter = {
+  async pullBuktiBayar(config) {
+    if (!config || !config.endpointUrl || !config.enabled) return null;
+    try {
+      const tenantId = config.tenantId || 'KL-SUKAMAJU-RW07-RT03';
+      const url = config.endpointUrl.replace(/\/+$/, '');
+      const headers = { 'Content-Type': 'application/json' };
+      if (config.apiKey) {
+        headers['apikey'] = config.apiKey;
+        headers['Authorization'] = `Bearer ${config.apiKey}`;
+      }
+
+      const fetchUrl = config.provider === 'supabase'
+        ? `${url}/rest/v1/bukti_bayar?tenant_id=eq.${encodeURIComponent(tenantId)}&select=*`
+        : `${url}/api/bukti-bayar?tenant_id=${encodeURIComponent(tenantId)}`;
+
+      const resp = await fetch(fetchUrl, { method: 'GET', headers });
+      if (!resp.ok) throw new Error(`HTTP Error ${resp.status}`);
+      const data = await resp.json();
+      return Array.isArray(data) ? data : [];
+    } catch (err) {
+      console.warn('[RemoteSyncAdapter] Gagal menarik data remote:', err);
+      throw err;
+    }
+  },
+
+  async pushBuktiBayar(item, config) {
+    if (!config || !config.endpointUrl || !config.enabled) return false;
+    try {
+      const url = config.endpointUrl.replace(/\/+$/, '');
+      const headers = {
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      };
+      if (config.apiKey) {
+        headers['apikey'] = config.apiKey;
+        headers['Authorization'] = `Bearer ${config.apiKey}`;
+      }
+
+      const postUrl = config.provider === 'supabase'
+        ? `${url}/rest/v1/bukti_bayar`
+        : `${url}/api/bukti-bayar`;
+
+      const payload = {
+        id: item.id,
+        tenant_id: config.tenantId || item.tenantId || 'KL-SUKAMAJU-RW07-RT03',
+        unit_id: item.unitId,
+        nama: item.nama,
+        blok: item.blok,
+        nomor_rumah: item.nomorRumah,
+        periode_bulan: item.periodeBulan,
+        nominal: item.nominal,
+        tanggal_bayar: item.tanggalBayar,
+        nomor_referensi: item.nomorReferensi,
+        status_verifikasi: item.statusVerifikasi,
+        image_hash: item.imageHash,
+        image_url: item.imageUrl,
+        catatan: item.catatan,
+        created_at: item.uploadedAt || new Date().toISOString()
+      };
+
+      const resp = await fetch(postUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+      return resp.ok;
+    } catch (err) {
+      console.warn('[RemoteSyncAdapter] Gagal mengirim data ke remote:', err);
+      return false;
+    }
+  }
 };
 
 // Data Default Pengaturan RT
@@ -431,28 +519,34 @@ const DEFAULT_BUKTI_BAYAR = [
 
 // Storage Helper
 window.SimStore = {
+  // Helper parsing aman tahan kerusakan JSON/Storage
+  _safeParse(key, fallback) {
+    try {
+      const data = localStorage.getItem(key);
+      if (!data) return fallback;
+      return JSON.parse(data);
+    } catch (e) {
+      console.warn(`[SimStore] Data korup terdeteksi pada kunci ${key}, mengembalikan data awal.`, e);
+      return fallback;
+    }
+  },
+
   getSettings() {
-    const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-    return data ? JSON.parse(data) : { ...DEFAULT_SETTINGS };
+    return this._safeParse(STORAGE_KEYS.SETTINGS, { ...DEFAULT_SETTINGS });
   },
   saveSettings(settings) {
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
   },
 
   getWarga() {
-    const data = localStorage.getItem(STORAGE_KEYS.WARGA);
-    if (!data) {
-      this.saveWarga(DEFAULT_WARGA);
-      return [...DEFAULT_WARGA];
-    }
-    return JSON.parse(data);
+    return this._safeParse(STORAGE_KEYS.WARGA, [...DEFAULT_WARGA]);
   },
   saveWarga(list) {
     localStorage.setItem(STORAGE_KEYS.WARGA, JSON.stringify(list));
   },
   addWarga(item) {
     const list = this.getWarga();
-    item.id = 'W-' + Date.now().toString().slice(-4);
+    item.id = item.id || ('W-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8));
     list.unshift(item);
     this.saveWarga(list);
     return item;
@@ -469,19 +563,14 @@ window.SimStore = {
   },
 
   getTransaksi() {
-    const data = localStorage.getItem(STORAGE_KEYS.TRANSAKSI);
-    if (!data) {
-      this.saveTransaksi(DEFAULT_TRANSAKSI);
-      return [...DEFAULT_TRANSAKSI];
-    }
-    return JSON.parse(data);
+    return this._safeParse(STORAGE_KEYS.TRANSAKSI, [...DEFAULT_TRANSAKSI]);
   },
   saveTransaksi(list) {
     localStorage.setItem(STORAGE_KEYS.TRANSAKSI, JSON.stringify(list));
   },
   addTransaksi(item) {
     const list = this.getTransaksi();
-    item.id = item.id || ('TRX-' + Date.now() + '-' + Math.floor(Math.random() * 1000));
+    item.id = item.id || ('TRX-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8));
     list.unshift(item);
     this.saveTransaksi(list);
     return item;
@@ -491,21 +580,47 @@ window.SimStore = {
     list = list.filter(item => item.id !== id);
     this.saveTransaksi(list);
   },
+  getRingkasanKas() {
+    const settings = this.getSettings();
+    const transaksiList = this.getTransaksi();
+    let totalMasuk = 0;
+    let totalKeluar = 0;
+    let saldoKasBank = Number(settings.saldoAwalBank) || (Number(settings.saldoAwal) ? Math.round(Number(settings.saldoAwal) * 0.8) : 2000000);
+    let saldoKasTunai = Number(settings.saldoAwalTunai) || (Number(settings.saldoAwal) ? Math.round(Number(settings.saldoAwal) * 0.2) : 500000);
+
+    transaksiList.forEach(t => {
+      const nom = Number(t.nominal) || 0;
+      const isTunai = (t.metodeBayar || '').toLowerCase().includes('tunai');
+      if (t.tipe === 'Pemasukan') {
+        totalMasuk += nom;
+        if (isTunai) saldoKasTunai += nom;
+        else saldoKasBank += nom;
+      }
+      if (t.tipe === 'Pengeluaran') {
+        totalKeluar += nom;
+        if (isTunai) saldoKasTunai -= nom;
+        else saldoKasBank -= nom;
+      }
+    });
+    const totalSaldo = saldoKasBank + saldoKasTunai;
+    return {
+      totalPemasukan: totalMasuk,
+      totalPengeluaran: totalKeluar,
+      saldoKasBank,
+      saldoKasTunai,
+      totalSaldo
+    };
+  },
 
   getSurat() {
-    const data = localStorage.getItem(STORAGE_KEYS.SURAT);
-    if (!data) {
-      this.saveSurat(DEFAULT_SURAT);
-      return [...DEFAULT_SURAT];
-    }
-    return JSON.parse(data);
+    return this._safeParse(STORAGE_KEYS.SURAT, [...DEFAULT_SURAT]);
   },
   saveSurat(list) {
     localStorage.setItem(STORAGE_KEYS.SURAT, JSON.stringify(list));
   },
   addSurat(item) {
     const list = this.getSurat();
-    item.id = 'SRT-' + Date.now().toString().slice(-4);
+    item.id = item.id || ('SRT-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8));
     list.unshift(item);
     this.saveSurat(list);
     return item;
@@ -517,19 +632,14 @@ window.SimStore = {
   },
 
   getTamu() {
-    const data = localStorage.getItem(STORAGE_KEYS.TAMU);
-    if (!data) {
-      this.saveTamu(DEFAULT_TAMU);
-      return [...DEFAULT_TAMU];
-    }
-    return JSON.parse(data);
+    return this._safeParse(STORAGE_KEYS.TAMU, [...DEFAULT_TAMU]);
   },
   saveTamu(list) {
     localStorage.setItem(STORAGE_KEYS.TAMU, JSON.stringify(list));
   },
   addTamu(item) {
     const list = this.getTamu();
-    item.id = 'TM-' + Date.now().toString().slice(-4);
+    item.id = item.id || ('TM-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8));
     list.unshift(item);
     this.saveTamu(list);
     return item;
@@ -541,12 +651,7 @@ window.SimStore = {
   },
 
   getRonda() {
-    const data = localStorage.getItem(STORAGE_KEYS.RONDA);
-    if (!data) {
-      this.saveRonda(DEFAULT_RONDA);
-      return [...DEFAULT_RONDA];
-    }
-    return JSON.parse(data);
+    return this._safeParse(STORAGE_KEYS.RONDA, [...DEFAULT_RONDA]);
   },
   saveRonda(list) {
     localStorage.setItem(STORAGE_KEYS.RONDA, JSON.stringify(list));
@@ -558,19 +663,14 @@ window.SimStore = {
   },
 
   getLaporanKeamanan() {
-    const data = localStorage.getItem(STORAGE_KEYS.LAPORAN_KEAMANAN);
-    if (!data) {
-      this.saveLaporanKeamanan(DEFAULT_LAPORAN_KEAMANAN);
-      return [...DEFAULT_LAPORAN_KEAMANAN];
-    }
-    return JSON.parse(data);
+    return this._safeParse(STORAGE_KEYS.LAPORAN_KEAMANAN, [...DEFAULT_LAPORAN_KEAMANAN]);
   },
   saveLaporanKeamanan(list) {
     localStorage.setItem(STORAGE_KEYS.LAPORAN_KEAMANAN, JSON.stringify(list));
   },
   addLaporanKeamanan(item) {
     const list = this.getLaporanKeamanan();
-    item.id = 'LK-' + Date.now().toString().slice(-4);
+    item.id = item.id || ('LK-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8));
     list.unshift(item);
     this.saveLaporanKeamanan(list);
     return item;
@@ -583,19 +683,14 @@ window.SimStore = {
 
   // Unit Rumah Management (Blok & No Rumah)
   getUnitRumah() {
-    const data = localStorage.getItem(STORAGE_KEYS.UNIT_RUMAH);
-    if (!data) {
-      this.saveUnitRumah(DEFAULT_UNIT_RUMAH);
-      return [...DEFAULT_UNIT_RUMAH];
-    }
-    return JSON.parse(data);
+    return this._safeParse(STORAGE_KEYS.UNIT_RUMAH, [...DEFAULT_UNIT_RUMAH]);
   },
   saveUnitRumah(list) {
     localStorage.setItem(STORAGE_KEYS.UNIT_RUMAH, JSON.stringify(list));
   },
   addUnitRumah(item) {
     const list = this.getUnitRumah();
-    item.id = 'UNIT-' + Date.now().toString().slice(-4);
+    item.id = item.id || ('UNIT-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8));
     list.push(item);
     this.saveUnitRumah(list);
     return item;
@@ -603,22 +698,22 @@ window.SimStore = {
 
   // Bukti Bayar Management
   getBuktiBayar() {
-    const data = localStorage.getItem(STORAGE_KEYS.BUKTI_BAYAR);
-    if (!data) {
-      this.saveBuktiBayar(DEFAULT_BUKTI_BAYAR);
-      return [...DEFAULT_BUKTI_BAYAR];
-    }
-    return JSON.parse(data);
+    return this._safeParse(STORAGE_KEYS.BUKTI_BAYAR, [...DEFAULT_BUKTI_BAYAR]);
   },
   saveBuktiBayar(list) {
     localStorage.setItem(STORAGE_KEYS.BUKTI_BAYAR, JSON.stringify(list));
   },
   addBuktiBayar(item) {
     const list = this.getBuktiBayar();
-    item.id = item.id || ('BB-' + Date.now() + '-' + Math.floor(Math.random() * 1000));
+    item.id = item.id || ('BB-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8));
     item.uploadedAt = item.uploadedAt || new Date().toISOString();
+    item.tenantId = item.tenantId || this.getTenantId();
     list.unshift(item);
     this.saveBuktiBayar(list);
+
+    if (this.isHostedMode()) {
+      this.dispatchCloudMutation('bukti_bayar', 'INSERT', item);
+    }
     return item;
   },
   updateBuktiBayar(id, updatedFields) {
@@ -643,6 +738,8 @@ window.SimStore = {
     localStorage.removeItem(STORAGE_KEYS.LAPORAN_KEAMANAN);
     localStorage.removeItem(STORAGE_KEYS.UNIT_RUMAH);
     localStorage.removeItem(STORAGE_KEYS.BUKTI_BAYAR);
+    localStorage.removeItem(STORAGE_KEYS.CLOUD_CONFIG);
+    localStorage.removeItem(STORAGE_KEYS.OFFLINE_QUEUE);
   },
 
   // Export full JSON backup
@@ -666,7 +763,13 @@ window.SimStore = {
   // Import JSON backup
   importBackupJSON(jsonString) {
     try {
+      if (!jsonString || typeof jsonString !== 'string') return false;
       const data = JSON.parse(jsonString);
+      if (!data || typeof data !== 'object') return false;
+      const knownKeys = ['settings', 'warga', 'transaksi', 'surat', 'tamu', 'ronda', 'laporanKeamanan', 'unitRumah', 'buktiBayar'];
+      const hasAny = knownKeys.some(k => k in data);
+      if (!hasAny) return false;
+
       if (data.settings) this.saveSettings(data.settings);
       if (data.warga) this.saveWarga(data.warga);
       if (data.transaksi) this.saveTransaksi(data.transaksi);
@@ -681,6 +784,196 @@ window.SimStore = {
       console.error('Failed to import JSON backup', e);
       return false;
     }
+  },
+
+  // ==========================================
+  // MODUL HOSTED WEB & STORAGE ADAPTER CLOUD
+  // ==========================================
+
+  // Deteksi mode runtime: Hosted Web (http/https) vs Standalone (file:///)
+  isHostedMode() {
+    return typeof window !== 'undefined' && !!window.location && window.location.protocol.startsWith('http');
+  },
+
+  // Konfigurasi Cloud Sync
+  getCloudConfig() {
+    return this._safeParse(STORAGE_KEYS.CLOUD_CONFIG, { ...DEFAULT_CLOUD_CONFIG });
+  },
+
+  saveCloudConfig(config) {
+    const current = this.getCloudConfig();
+    const updated = { ...current, ...config };
+    localStorage.setItem(STORAGE_KEYS.CLOUD_CONFIG, JSON.stringify(updated));
+    return updated;
+  },
+
+  getTenantId() {
+    const config = this.getCloudConfig();
+    return config.tenantId || 'KL-SUKAMAJU-RW07-RT03';
+  },
+
+  // Antrean Mutasi Luring (Offline Mutation Queue)
+  getOfflineQueue() {
+    return this._safeParse(STORAGE_KEYS.OFFLINE_QUEUE, []);
+  },
+
+  enqueueOffline(action, entity, data) {
+    const queue = this.getOfflineQueue();
+    queue.push({
+      id: 'MUT-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+      action,
+      entity,
+      data,
+      timestamp: new Date().toISOString()
+    });
+    localStorage.setItem(STORAGE_KEYS.OFFLINE_QUEUE, JSON.stringify(queue));
+  },
+
+  clearOfflineQueue() {
+    localStorage.setItem(STORAGE_KEYS.OFFLINE_QUEUE, JSON.stringify([]));
+  },
+
+  // Pengiriman Mutasi ke Cloud (Async Non-Blocking)
+  async dispatchCloudMutation(entity, action, item) {
+    const config = this.getCloudConfig();
+    if (!config.enabled || !config.endpointUrl) {
+      return { success: false, reason: 'cloud_disabled' };
+    }
+    try {
+      if (entity === 'bukti_bayar' && action === 'INSERT') {
+        const ok = await RemoteSyncAdapter.pushBuktiBayar(item, config);
+        if (!ok) {
+          this.enqueueOffline(action, entity, item);
+        }
+        return { success: ok };
+      }
+      return { success: true };
+    } catch (e) {
+      this.enqueueOffline(action, entity, item);
+      return { success: false, error: e };
+    }
+  },
+
+  // Pengujian Koneksi Cloud Endpoint
+  async testCloudConnection(configToTest) {
+    const config = configToTest || this.getCloudConfig();
+    if (!config.endpointUrl) {
+      return { ok: false, message: 'URL Endpoint Cloud belum diisi!' };
+    }
+    try {
+      const url = config.endpointUrl.replace(/\/+$/, '');
+      const testUrl = config.provider === 'supabase'
+        ? `${url}/rest/v1/`
+        : `${url}/api/health`;
+      const headers = { 'Accept': 'application/json' };
+      if (config.apiKey) headers['apikey'] = config.apiKey;
+
+      const resp = await fetch(testUrl, { method: 'HEAD', headers }).catch(() => fetch(testUrl, { method: 'GET', headers }));
+      return {
+        ok: resp.ok || resp.status === 401 || resp.status === 404,
+        status: resp.status,
+        message: resp.ok ? 'Koneksi ke Server Cloud Berhasil!' : `Server merespons: Status HTTP ${resp.status}`
+      };
+    } catch (e) {
+      return { ok: false, message: 'Gagal terhubung: ' + (e.message || 'Network error') };
+    }
+  },
+
+  // Sinkronisasi Dua Arah (Bidirectional Remote Sync)
+  async syncRemote() {
+    const config = this.getCloudConfig();
+    if (!config.enabled || !config.endpointUrl) {
+      return { success: false, reason: 'Cloud Sync belum diaktifkan dalam pengaturan.' };
+    }
+    try {
+      this.saveCloudConfig({ syncStatus: 'syncing' });
+      const remoteItems = await RemoteSyncAdapter.pullBuktiBayar(config);
+      let mergeCount = 0;
+
+      if (Array.isArray(remoteItems) && remoteItems.length > 0) {
+        const localList = this.getBuktiBayar();
+        const existingIds = new Set(localList.map(b => b.id));
+        const existingHashes = new Set(localList.map(b => b.imageHash).filter(Boolean));
+
+        remoteItems.forEach(r => {
+          const norm = {
+            id: r.id,
+            tenantId: r.tenant_id || r.tenantId || config.tenantId,
+            unitId: r.unit_id || r.unitId,
+            nama: r.nama,
+            blok: r.blok,
+            nomorRumah: r.nomor_rumah || r.nomorRumah,
+            periodeBulan: r.periode_bulan || r.periodeBulan,
+            nominal: Number(r.nominal),
+            tanggalBayar: r.tanggal_bayar || r.tanggalBayar,
+            nomorReferensi: r.nomor_referensi || r.nomorReferensi,
+            statusVerifikasi: r.status_verifikasi || r.statusVerifikasi || 'Menunggu Verifikasi',
+            transaksiId: r.transaksi_id || r.transaksiId || null,
+            imageHash: r.image_hash || r.imageHash,
+            imageUrl: r.image_url || r.imageUrl,
+            catatan: r.catatan,
+            uploadedAt: r.created_at || r.uploadedAt || new Date().toISOString()
+          };
+
+          if (!existingIds.has(norm.id) && (!norm.imageHash || !existingHashes.has(norm.imageHash))) {
+            localList.unshift(norm);
+            existingIds.add(norm.id);
+            if (norm.imageHash) existingHashes.add(norm.imageHash);
+            mergeCount++;
+          }
+        });
+
+        if (mergeCount > 0) {
+          this.saveBuktiBayar(localList);
+        }
+      }
+
+      // Kirim mutasi luring yang tertunda jika ada
+      const flushedCount = await this.flushOfflineQueue();
+
+      const now = new Date().toISOString();
+      this.saveCloudConfig({
+        syncStatus: 'online',
+        lastSyncTime: now
+      });
+
+      if (typeof window !== 'undefined' && window.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('simwarga:synced', {
+          detail: { mergeCount, flushedCount, lastSyncTime: now }
+        }));
+      }
+
+      return { success: true, mergeCount, flushedCount, timestamp: now };
+    } catch (err) {
+      this.saveCloudConfig({ syncStatus: 'error' });
+      return { success: false, error: err.message };
+    }
+  },
+
+  // Eksekusi Antrean Luring
+  async flushOfflineQueue() {
+    const queue = this.getOfflineQueue();
+    if (!queue || queue.length === 0) return 0;
+    const config = this.getCloudConfig();
+    if (!config.enabled || !config.endpointUrl) return 0;
+
+    const remaining = [];
+    let flushedCount = 0;
+    for (const item of queue) {
+      try {
+        if (item.entity === 'bukti_bayar' && item.action === 'INSERT') {
+          const ok = await RemoteSyncAdapter.pushBuktiBayar(item.data, config);
+          if (ok) flushedCount++;
+          else remaining.push(item);
+        } else {
+          flushedCount++;
+        }
+      } catch (e) {
+        remaining.push(item);
+      }
+    }
+    localStorage.setItem(STORAGE_KEYS.OFFLINE_QUEUE, JSON.stringify(remaining));
+    return flushedCount;
   }
 };
 

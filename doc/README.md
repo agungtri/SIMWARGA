@@ -57,7 +57,7 @@ Dokumentasi ini disusun untuk pengembang, arsitek perangkat lunak, maupun admini
 
 6. [Spesifikasi Pengujian & Verifikasi](panduan-pengujian.md)
    - Arsitektur *Automated Test Suite* ([test_runner.html](../test_runner.html)).
-   - Rincian 18 kasus uji (*Unit & Integration Tests*).
+   - Rincian 80 kasus uji (*Unit, Integration, Hardness & Hosted Web Tests* lintas 21 seksi).
    - Panduan eksekusi pengujian di peramban *headless* (Chrome / Edge).
 
 7. [Desain Antarmuka & Mockup Material Design 3](design/mockup-material-design.md)

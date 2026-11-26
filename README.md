@@ -6,7 +6,18 @@ Aplikasi web modern, ringan, dan mandiri (*standalone*) untuk pencatatan dan pen
 
 ## 🌟 Fitur Unggulan
 
-1. **Master Data Warga & Kartu Keluarga (KK)**
+1. **Sistem Login Pengguna & Hak Akses Berjenjang (Role-Based Access Control / RBAC)**
+   - Autentikasi aman berbasis enkripsi hash kriptografis **SHA-256**.
+   - Pemisahan hak akses modul secara ketat berdasarkan peran (*Role*):
+     - **Ketua RT (Admin)**: Akses menyeluruh ke semua modul sistem termasuk konfigurasi RT dan manajemen akun pengguna.
+     - **Bendahara RT**: Fokus pada pembukuan kas, verifikasi bukti iuran QR warga, penerimaan iuran tunai, dan laporan rekapitulasi.
+     - **Sekretaris RT**: Fokus pada pengelolaan data induk kependudukan & Kartu Keluarga (KK), pencetakan surat pengantar resmi, dan buku tamu.
+     - **Petugas Keamanan**: Akses buku tamu, pendataan kontrakan, dan jadwal ronda siskamling lingkungan.
+     - **Warga Lingkungan**: Portal monitoring transparansi kas RT, status kartu iuran rumah, dan pengajuan surat.
+   - **Tombol Akses Cepat Demo (*Quick Login*)**: Masuk instan dengan sekali klik untuk pengujian seluruh peran tanpa perlu mengetik manual.
+   - **Manajemen Akun Pengguna**: Tambah, edit kata sandi, ubah peran, dan aktifkan/nonaktifkan akun dari menu Pengaturan.
+
+2. **Master Data Warga & Kartu Keluarga (KK)**
    - Pencatatan lengkap: NIK 16 digit, No. KK, Nama, TTL, Jenis Kelamin, Agama, Pendidikan, Pekerjaan, Status Perkawinan, Hubungan Keluarga, Status Domisili, Golongan Darah, No. WhatsApp, dan Alamat.
    - Dua tampilan fleksibel: **Daftar Semua Warga** dan **Kelompok Kartu Keluarga (KK)**.
    - Pencarian cepat (*instant search*) berdasarkan nama, NIK, KK, pekerjaan, alamat, serta filter gender dan hubungan keluarga.
@@ -67,14 +78,25 @@ Aplikasi web modern, ringan, dan mandiri (*standalone*) untuk pencatatan dan pen
 
 ---
 
-## 🚀 Cara Menjalankan Aplikasi
+## 🚀 Cara Menjalankan Aplikasi & Kredensial Login
 
 Aplikasi ini bersifat **100% Client-Side Modern Web App** tanpa perlu konfigurasi web server (Apache/Node.js/PHP).
 
-1. Cukup buka file `index.html` dengan cara:
-   - **Klik dua kali (*double click*) file `index.html`** langsung di File Explorer, atau
-   - Buka menggunakan peramban modern pilihan Anda (Google Chrome, Microsoft Edge, Mozilla Firefox, Brave, Safari).
-2. Data tersimpan secara otomatis di peramban Anda menggunakan media penyimpanan `localStorage`.
+1. Buka aplikasi dengan salah satu cara berikut:
+   - Akses via GitHub Pages: **[https://agungtri.github.io/SIMWARGA/](https://agungtri.github.io/SIMWARGA/)**
+   - Atau **klik dua kali (*double click*) file `index.html`** langsung di File Explorer.
+2. Masuk menggunakan salah satu akun bawaan berikut (atau klik tombol **Akses Cepat Pengujian (Demo)** di layar login):
+
+| Peran (Role) | Username | Password | Nama Lengkap | Cakupan Akses Modul |
+| :--- | :--- | :--- | :--- | :--- |
+| **Ketua RT (Admin)** | `admin` | `admin123` | H. Bambang Sudrajat | Akses Penuh: Semua modul, Pengaturan & Manajemen Akun |
+| **Bendahara RT** | `bendahara` | `bendahara123` | Hj. Siti Aminah | Dashboard, Buku Kas Umum, Verifikasi Bukti QR, Matriks Rekapitulasi |
+| **Sekretaris RT** | `sekretaris` | `sekretaris123` | Hendra Wijaya | Dashboard, Data Warga & Kartu Keluarga (KK), Layanan Surat, Buku Tamu |
+| **Petugas Keamanan** | `keamanan` | `keamanan123` | Pak Joko Sutrisno | Dashboard, Buku Tamu & Kontrakan, Jadwal Ronda Siskamling |
+| **Warga Lingkungan** | `warga` | `warga123` | Budi Santoso | Dashboard Transparansi Kas, Kartu Iuran Rumah, Pengajuan Surat Pengantar |
+
+> [!TIP]
+> **Portal Pembayaran Warga Mandiri (`bayar.html`)**: Warga yang ingin mengonfirmasi transfer iuran via stiker QR di pintu rumah tetap dapat mengakses `bayar.html` secara langsung **tanpa perlu login (Zero-Login)**.
 
 ---
 

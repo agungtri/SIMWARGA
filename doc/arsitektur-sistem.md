@@ -17,7 +17,7 @@ flowchart TB
     end
 
     subgraph AdminLayer ["Sisi Pengurus RT/RW (Desktop / Tablet)"]
-        AdminApp["index.html (SIMWARGA Dashboard)"]
+        AuthGate["Autentikasi SHA-256 & RBAC<br/>(Admin, Bendahara, Sekretaris, Keamanan, Warga)"] --> AdminApp["index.html (SIMWARGA Dashboard)"]
         AdminApp --> VerifModal["Verifikasi Split-Screen<br/>(Foto Struk + Analisis OCR)"]
         AdminApp --> KasModule["Buku Kas & Riwayat Keuangan"]
         AdminApp --> ReportModule["Matriks Rekapitulasi per Blok (12 Bulan)"]

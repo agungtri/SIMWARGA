@@ -14,8 +14,112 @@ const STORAGE_KEYS = {
   BUKTI_BAYAR: 'simwarga_bukti_bayar',
   UNIT_RUMAH: 'simwarga_unit_rumah',
   CLOUD_CONFIG: 'simwarga_cloud_config',
-  OFFLINE_QUEUE: 'simwarga_offline_queue'
+  OFFLINE_QUEUE: 'simwarga_offline_queue',
+  USERS: 'simwarga_users',
+  AUTH_SESSION: 'simwarga_auth_session'
 };
+
+// Definisi Peran Pengguna & Matriks Hak Akses (RBAC)
+const USER_ROLES = {
+  ADMIN: 'admin',
+  BENDAHARA: 'bendahara',
+  SEKRETARIS: 'sekretaris',
+  KEAMANAN: 'keamanan',
+  WARGA: 'warga'
+};
+
+const ROLE_PERMISSIONS = {
+  admin: {
+    label: 'Ketua RT (Admin)',
+    badgeColor: 'blue',
+    allowedTabs: ['dashboard', 'warga', 'keuangan', 'surat', 'tamu', 'keamanan', 'settings'],
+    canManageUsers: true
+  },
+  bendahara: {
+    label: 'Bendahara RT',
+    badgeColor: 'emerald',
+    allowedTabs: ['dashboard', 'keuangan'],
+    canManageUsers: false
+  },
+  sekretaris: {
+    label: 'Sekretaris RT',
+    badgeColor: 'purple',
+    allowedTabs: ['dashboard', 'warga', 'surat', 'tamu'],
+    canManageUsers: false
+  },
+  keamanan: {
+    label: 'Petugas Keamanan & Ronda',
+    badgeColor: 'amber',
+    allowedTabs: ['dashboard', 'tamu', 'keamanan'],
+    canManageUsers: false
+  },
+  warga: {
+    label: 'Warga Lingkungan',
+    badgeColor: 'slate',
+    allowedTabs: ['dashboard', 'keuangan', 'surat'],
+    canManageUsers: false
+  }
+};
+
+// Data Default Pengguna Sistem (Akun Demo & Bawaan)
+const DEFAULT_USERS = [
+  {
+    id: 'USR-001',
+    username: 'admin',
+    passwordHash: '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', // admin123
+    namaLengkap: 'H. Bambang Sudrajat',
+    role: 'admin',
+    roleLabel: 'Ketua RT (Admin)',
+    jabatan: 'Ketua RT 03',
+    status: 'aktif',
+    lastLogin: null
+  },
+  {
+    id: 'USR-002',
+    username: 'bendahara',
+    passwordHash: 'dff9cd137cab8b96431ccd81f8bb433fc71f0329eefb54bd4380b3fc3a9fc5d1', // bendahara123
+    namaLengkap: 'Hj. Siti Aminah',
+    role: 'bendahara',
+    roleLabel: 'Bendahara RT',
+    jabatan: 'Bendahara Keuangan RT',
+    status: 'aktif',
+    lastLogin: null
+  },
+  {
+    id: 'USR-003',
+    username: 'sekretaris',
+    passwordHash: 'b266dd6db331e165a8be1a57d46b4f49572108e710d52ff9e92f608891e1d97b', // sekretaris123
+    namaLengkap: 'Hendra Wijaya',
+    role: 'sekretaris',
+    roleLabel: 'Sekretaris RT',
+    jabatan: 'Sekretaris Administrasi RT',
+    status: 'aktif',
+    lastLogin: null
+  },
+  {
+    id: 'USR-004',
+    username: 'keamanan',
+    passwordHash: '4e85ff5ee3fe2b2181b50aa14d31846291406ba9cb5ae9c508b0bb7acd8d7866', // keamanan123
+    namaLengkap: 'Pak Joko Sutrisno',
+    role: 'keamanan',
+    roleLabel: 'Petugas Keamanan & Ronda',
+    jabatan: 'Koordinator Kamling RT',
+    status: 'aktif',
+    lastLogin: null
+  },
+  {
+    id: 'USR-005',
+    username: 'warga',
+    passwordHash: '6b21de8534cbd0297f5217e53625b14f2ff44f317b262d6ea001da397b7552ea', // warga123
+    namaLengkap: 'Budi Santoso',
+    role: 'warga',
+    roleLabel: 'Warga Lingkungan',
+    jabatan: 'Warga Blok A No. 18',
+    unitId: 'UNIT-A04',
+    status: 'aktif',
+    lastLogin: null
+  }
+];
 
 // Konfigurasi Bawaan Cloud Sync (Mode Hosted Web)
 const DEFAULT_CLOUD_CONFIG = {
@@ -814,12 +918,15 @@ window.SimStore = {
     localStorage.removeItem(STORAGE_KEYS.BUKTI_BAYAR);
     localStorage.removeItem(STORAGE_KEYS.CLOUD_CONFIG);
     localStorage.removeItem(STORAGE_KEYS.OFFLINE_QUEUE);
+    localStorage.removeItem(STORAGE_KEYS.USERS);
+    localStorage.removeItem(STORAGE_KEYS.AUTH_SESSION);
+    try { sessionStorage.removeItem(STORAGE_KEYS.AUTH_SESSION); } catch (e) {}
   },
 
   // Export full JSON backup
   exportBackupJSON() {
     const fullBackup = {
-      version: '1.1',
+      version: '1.2',
       exportedAt: new Date().toISOString(),
       settings: this.getSettings(),
       warga: this.getWarga(),
@@ -829,7 +936,8 @@ window.SimStore = {
       ronda: this.getRonda(),
       laporanKeamanan: this.getLaporanKeamanan(),
       unitRumah: this.getUnitRumah(),
-      buktiBayar: this.getBuktiBayar()
+      buktiBayar: this.getBuktiBayar(),
+      users: this.getUsers()
     };
     return JSON.stringify(fullBackup, null, 2);
   },
@@ -840,7 +948,7 @@ window.SimStore = {
       if (!jsonString || typeof jsonString !== 'string') return false;
       const data = JSON.parse(jsonString);
       if (!data || typeof data !== 'object') return false;
-      const knownKeys = ['settings', 'warga', 'transaksi', 'surat', 'tamu', 'ronda', 'laporanKeamanan', 'unitRumah', 'buktiBayar'];
+      const knownKeys = ['settings', 'warga', 'transaksi', 'surat', 'tamu', 'ronda', 'laporanKeamanan', 'unitRumah', 'buktiBayar', 'users'];
       const hasAny = knownKeys.some(k => k in data);
       if (!hasAny) return false;
 
@@ -853,6 +961,7 @@ window.SimStore = {
       if (data.laporanKeamanan) this.saveLaporanKeamanan(data.laporanKeamanan);
       if (data.unitRumah) this.saveUnitRumah(data.unitRumah);
       if (data.buktiBayar) this.saveBuktiBayar(data.buktiBayar);
+      if (data.users && Array.isArray(data.users)) this.saveUsers(data.users);
       return true;
     } catch (e) {
       console.error('Failed to import JSON backup', e);
@@ -1048,6 +1157,306 @@ window.SimStore = {
     }
     localStorage.setItem(STORAGE_KEYS.OFFLINE_QUEUE, JSON.stringify(remaining));
     return flushedCount;
+  },
+
+  // ==========================================
+  // MODUL PENGGUNA & AUTENTIKASI (RBAC)
+  // ==========================================
+
+  getUsers() {
+    return this._safeParse(STORAGE_KEYS.USERS, DEFAULT_USERS);
+  },
+
+  saveUsers(list) {
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(list));
+  },
+
+  getUserById(id) {
+    const users = this.getUsers();
+    return users.find(u => u.id === id) || null;
+  },
+
+  getUserByUsername(username) {
+    if (!username) return null;
+    const users = this.getUsers();
+    return users.find(u => u.username.toLowerCase() === username.trim().toLowerCase()) || null;
+  },
+
+  // Perhitungan Hash SHA-256 (Mendukung Web Crypto & Pure JS Fallback)
+  async hashPassword(password) {
+    if (!password) return '';
+    try {
+      if (typeof crypto !== 'undefined' && crypto.subtle) {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(password);
+        const hash = await crypto.subtle.digest('SHA-256', data);
+        return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+      }
+    } catch (e) {
+      // fallback
+    }
+    return this.hashPasswordSync(password);
+  },
+
+  // Synchronous SHA-256 Hash Calculation (Zero-Dependency & Offline Standalone)
+  hashPasswordSync(ascii) {
+    if (!ascii) return '';
+    function rightRotate(value, amount) { return (value >>> amount) | (value << (32 - amount)); }
+    var mathPow = Math.pow;
+    var maxWord = mathPow(2, 32);
+    var lengthProperty = 'length';
+    var i, j;
+    var result = '';
+    var words = [];
+    var asciiBitLength = ascii[lengthProperty] * 8;
+    var hash = [];
+    var k = [];
+    var primeCounter = 0;
+    var isComposite = {};
+    for (var candidate = 2; primeCounter < 64; candidate++) {
+      if (!isComposite[candidate]) {
+        for (i = 0; i < 313; i += candidate) isComposite[i] = candidate;
+        hash[primeCounter] = (mathPow(candidate, .5) * maxWord) | 0;
+        k[primeCounter++] = (mathPow(candidate, 1/3) * maxWord) | 0;
+      }
+    }
+    ascii += '\x80';
+    while ((ascii[lengthProperty] % 64) !== 56) ascii += '\x00';
+    for (i = 0; i < ascii[lengthProperty]; i++) {
+      j = ascii.charCodeAt(i);
+      words[i >> 2] |= j << ((3 - i) % 4) * 8;
+    }
+    words[words[lengthProperty]] = ((asciiBitLength / maxWord) | 0);
+    words[words[lengthProperty]] = (asciiBitLength | 0);
+    for (j = 0; j < words[lengthProperty];) {
+      var w = words.slice(j, j += 16);
+      var oldHash = hash;
+      hash = hash.slice(0, 8);
+      for (i = 0; i < 64; i++) {
+        var i2 = i + j;
+        var w15 = w[i - 15], w2 = w[i - 2];
+        var a = hash[0], e = hash[4];
+        var temp1 = hash[7]
+          + (rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25))
+          + ((e & hash[5]) ^ ((~e) & hash[6]))
+          + k[i]
+          + (w[i] = (i < 16) ? w[i] : (
+              w[i - 16]
+              + (rightRotate(w15, 7) ^ rightRotate(w15, 18) ^ (w15 >>> 3))
+              + w[i - 7]
+              + (rightRotate(w2, 17) ^ rightRotate(w2, 19) ^ (w2 >>> 10))
+            ) | 0
+          );
+        var temp2 = (rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22))
+          + ((a & hash[1]) ^ (a & hash[2]) ^ (hash[1] & hash[2]));
+        hash = [(temp1 + temp2) | 0].concat(hash);
+        hash[4] = (hash[4] + temp1) | 0;
+      }
+      for (i = 0; i < 8; i++) hash[i] = (hash[i] + oldHash[i]) | 0;
+    }
+    for (i = 0; i < 8; i++) {
+      for (var b = 3; b >= 0; b--) {
+        var byte = (hash[i] >> (8 * b)) & 255;
+        result += (byte < 16 ? '0' : '') + byte.toString(16);
+      }
+    }
+    return result;
+  },
+
+  // Verifikasi Kredensial & Pembuatan Sesi Login
+  async authenticate(username, password, remember = true) {
+    if (!username || !password) {
+      return { success: false, message: 'Username dan kata sandi wajib diisi.' };
+    }
+    const user = this.getUserByUsername(username);
+    if (!user) {
+      return { success: false, message: 'Username atau kata sandi tidak sesuai.' };
+    }
+    if (user.status !== 'aktif') {
+      return { success: false, message: 'Akun ini dinonaktifkan. Hubungi Ketua RT / Administrator.' };
+    }
+
+    const inputHash = await this.hashPassword(password);
+    if (user.passwordHash !== inputHash) {
+      return { success: false, message: 'Kata sandi tidak sesuai. Silakan periksa kembali.' };
+    }
+
+    // Catat timestamp login terakhir
+    const nowIso = new Date().toISOString();
+    user.lastLogin = nowIso;
+    await this.updateUser(user.id, { lastLogin: nowIso });
+
+    // Format objek sesi otorisasi
+    const roleMeta = this.getRoleMeta(user.role);
+    const sessionData = {
+      userId: user.id,
+      username: user.username,
+      namaLengkap: user.namaLengkap,
+      role: user.role,
+      roleLabel: user.roleLabel || roleMeta.label,
+      badgeColor: roleMeta.badgeColor,
+      jabatan: user.jabatan || '',
+      token: 'TKN-' + Math.random().toString(36).substring(2, 10).toUpperCase() + '-' + Date.now(),
+      loginAt: nowIso,
+      remember: !!remember
+    };
+
+    const sessionStr = JSON.stringify(sessionData);
+    if (remember) {
+      localStorage.setItem(STORAGE_KEYS.AUTH_SESSION, sessionStr);
+    } else {
+      sessionStorage.setItem(STORAGE_KEYS.AUTH_SESSION, sessionStr);
+      localStorage.removeItem(STORAGE_KEYS.AUTH_SESSION);
+    }
+
+    return {
+      success: true,
+      user: sessionData
+    };
+  },
+
+  // Ambil Data Sesi Pengguna Aktif
+  getCurrentUser() {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.AUTH_SESSION) || sessionStorage.getItem(STORAGE_KEYS.AUTH_SESSION);
+      if (!saved) return null;
+      const session = JSON.parse(saved);
+      if (!session || !session.userId) return null;
+
+      // Pastikan akun pengguna masih terdaftar dan berstatus aktif
+      const user = this.getUserById(session.userId);
+      if (!user || user.status !== 'aktif') {
+        this.logout();
+        return null;
+      }
+      return session;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  // Logout & Pembersihan Sesi
+  logout() {
+    localStorage.removeItem(STORAGE_KEYS.AUTH_SESSION);
+    try { sessionStorage.removeItem(STORAGE_KEYS.AUTH_SESSION); } catch (e) {}
+    return true;
+  },
+
+  // Matriks Otorisasi RBAC
+  canAccessTab(role, tabId) {
+    if (!role) return false;
+    const perm = ROLE_PERMISSIONS[role];
+    if (!perm) return false;
+    return perm.allowedTabs.includes(tabId);
+  },
+
+  getAllowedTabs(role) {
+    if (!role) return [];
+    const perm = ROLE_PERMISSIONS[role];
+    return perm ? [...perm.allowedTabs] : [];
+  },
+
+  getRoleMeta(role) {
+    return ROLE_PERMISSIONS[role] || {
+      label: role,
+      badgeColor: 'slate',
+      allowedTabs: ['dashboard'],
+      canManageUsers: false
+    };
+  },
+
+  // CRUD Akun Pengguna
+  async addUser(item) {
+    const list = this.getUsers();
+    if (!item.username || !item.username.trim()) {
+      throw new Error('Username wajib diisi.');
+    }
+    const cleanUsername = item.username.trim().toLowerCase();
+    const existing = list.find(u => u.username.toLowerCase() === cleanUsername);
+    if (existing) {
+      throw new Error(`Username "${cleanUsername}" sudah terdaftar.`);
+    }
+
+    const id = item.id || `USR-${String(list.length + 1).padStart(3, '0')}`;
+    const passwordHash = item.passwordHash || (item.password ? await this.hashPassword(item.password) : this.hashPasswordSync('123456'));
+    const roleMeta = this.getRoleMeta(item.role || 'warga');
+
+    const newUser = {
+      id,
+      username: cleanUsername,
+      passwordHash,
+      namaLengkap: item.namaLengkap ? item.namaLengkap.trim() : cleanUsername,
+      role: item.role || 'warga',
+      roleLabel: item.roleLabel || roleMeta.label,
+      jabatan: item.jabatan ? item.jabatan.trim() : '',
+      status: item.status || 'aktif',
+      lastLogin: null
+    };
+
+    list.push(newUser);
+    this.saveUsers(list);
+    return newUser;
+  },
+
+  async updateUser(id, updatedFields) {
+    let list = this.getUsers();
+    const idx = list.findIndex(u => u.id === id);
+    if (idx === -1) return false;
+
+    const copy = { ...list[idx] };
+
+    // Ganti password jika diisi
+    if (updatedFields.password && updatedFields.password.trim()) {
+      copy.passwordHash = await this.hashPassword(updatedFields.password.trim());
+    } else if (updatedFields.passwordHash) {
+      copy.passwordHash = updatedFields.passwordHash;
+    }
+
+    if (updatedFields.username && updatedFields.username.trim().toLowerCase() !== copy.username) {
+      const cleanU = updatedFields.username.trim().toLowerCase();
+      const existing = list.find(u => u.id !== id && u.username.toLowerCase() === cleanU);
+      if (existing) throw new Error(`Username "${cleanU}" sudah dipakai oleh pengguna lain.`);
+      copy.username = cleanU;
+    }
+
+    if (updatedFields.namaLengkap !== undefined) copy.namaLengkap = updatedFields.namaLengkap.trim();
+    if (updatedFields.jabatan !== undefined) copy.jabatan = updatedFields.jabatan.trim();
+    if (updatedFields.status !== undefined) copy.status = updatedFields.status;
+    if (updatedFields.lastLogin !== undefined) copy.lastLogin = updatedFields.lastLogin;
+
+    if (updatedFields.role !== undefined) {
+      copy.role = updatedFields.role;
+      const meta = this.getRoleMeta(updatedFields.role);
+      copy.roleLabel = meta.label;
+    }
+
+    list[idx] = copy;
+    this.saveUsers(list);
+    return copy;
+  },
+
+  deleteUser(id) {
+    if (id === 'USR-001') {
+      throw new Error('Akun Administrator utama (Ketua RT) tidak dapat dihapus.');
+    }
+    const currentUser = this.getCurrentUser();
+    if (currentUser && currentUser.userId === id) {
+      throw new Error('Tidak dapat menghapus akun yang sedang aktif digunakan saat ini.');
+    }
+    let list = this.getUsers();
+    const prevLen = list.length;
+    list = list.filter(u => u.id !== id);
+    if (list.length === prevLen) return false;
+    this.saveUsers(list);
+    return true;
   }
 };
+
+// Ekspor Definisi Konstanta ke Namespace SimStore & Window
+SimStore.USER_ROLES = USER_ROLES;
+SimStore.ROLE_PERMISSIONS = ROLE_PERMISSIONS;
+SimStore.DEFAULT_USERS = DEFAULT_USERS;
+if (typeof window !== 'undefined') {
+  window.SimStore = SimStore;
+}
 

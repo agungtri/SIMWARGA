@@ -701,6 +701,75 @@
       // Reset konfigurasi cloud ke default agar tidak mempengaruhi tes lain
       SimStore.saveCloudConfig({ enabled: false, endpointUrl: '', apiKey: '' });
 
+      // 22. UJI AUTENTIKASI PENGGUNA & ROLE-BASED ACCESS CONTROL (RBAC)
+      logSection('PENGUJIAN 22: Autentikasi Pengguna & Role-Based Access Control (RBAC)');
+
+      // Master User Bawaan
+      const defaultUsers = SimStore.getUsers();
+      assert(Array.isArray(defaultUsers) && defaultUsers.length >= 5, 'Master pengguna default terdaftar (minimal 5 peran)', `Ditemukan: ${defaultUsers.length}`);
+
+      const adminUser = SimStore.getUserByUsername('admin');
+      assert(adminUser && adminUser.role === 'admin' && adminUser.namaLengkap === 'H. Bambang Sudrajat', 'Akun Ketua RT (Admin) terverifikasi dengan profil valid');
+
+      const bendaharaUser = SimStore.getUserByUsername('bendahara');
+      assert(bendaharaUser && bendaharaUser.role === 'bendahara', 'Akun Bendahara RT terdaftar dengan peran bendahara');
+
+      // Validasi Hashing Password
+      const testAdminHash = await SimStore.hashPassword('admin123');
+      assert(testAdminHash === '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', 'Hash SHA-256 kata sandi admin cocok presisi');
+
+      // Autentikasi Sukses
+      const authSuccess = await SimStore.authenticate('admin', 'admin123', true);
+      assert(authSuccess.success === true && authSuccess.user && authSuccess.user.username === 'admin', 'Login dengan kredensial valid berhasil membuat sesi terotorisasi');
+
+      const currentSession = SimStore.getCurrentUser();
+      assert(currentSession && currentSession.username === 'admin' && currentSession.role === 'admin', 'Sesi login aktif berhasil diperoleh dari store (getCurrentUser)');
+
+      // Autentikasi Gagal (Kata Sandi Salah)
+      const authFailPass = await SimStore.authenticate('admin', 'salah_password');
+      assert(authFailPass.success === false, 'Login ditolak ketika memasukkan kata sandi yang salah');
+
+      // Autentikasi Gagal (Username Tidak Terdaftar)
+      const authFailUser = await SimStore.authenticate('hantu_cyber', '123456');
+      assert(authFailUser.success === false, 'Login ditolak ketika username tidak terdaftar di sistem');
+
+      // Matriks Hak Akses (RBAC)
+      assert(SimStore.canAccessTab('admin', 'settings') === true, 'Peran Admin memiliki hak akses ke modul Pengaturan RT & User');
+      assert(SimStore.canAccessTab('bendahara', 'settings') === false, 'Peran Bendahara diblokir dari modul Pengaturan RT & User');
+      assert(SimStore.canAccessTab('bendahara', 'keuangan') === true, 'Peran Bendahara memiliki hak akses ke modul Kas & Iuran');
+      assert(SimStore.canAccessTab('sekretaris', 'surat') === true, 'Peran Sekretaris memiliki hak akses ke Layanan Surat');
+      assert(SimStore.canAccessTab('keamanan', 'keamanan') === true, 'Peran Keamanan memiliki hak akses ke Jadwal Ronda & Tamu');
+      assert(SimStore.canAccessTab('warga', 'warga') === false, 'Peran Warga dibatasi dari master data kependudukan seluruh warga');
+
+      // Manajemen Pengguna (CRUD)
+      const newUser = await SimStore.addUser({
+        username: 'wakil_rt',
+        password: 'password123',
+        namaLengkap: 'Drs. Supardi',
+        role: 'sekretaris',
+        jabatan: 'Wakil Ketua RT'
+      });
+      assert(newUser && newUser.username === 'wakil_rt', 'Penambahan akun pengguna baru berhasil dicatat di storage');
+
+      const updatedUser = await SimStore.updateUser(newUser.id, { jabatan: 'Wakil Ketua RT I' });
+      assert(updatedUser && updatedUser.jabatan === 'Wakil Ketua RT I', 'Pembaruan data akun pengguna berhasil disimpan');
+
+      const deleteRes = SimStore.deleteUser(newUser.id);
+      assert(deleteRes === true && !SimStore.getUserByUsername('wakil_rt'), 'Penghapusan akun pengguna berhasil diverifikasi');
+
+      // Pengamanan Akun Master Admin Utama
+      let masterAdminProtected = false;
+      try {
+        SimStore.deleteUser('USR-001');
+      } catch (err) {
+        masterAdminProtected = true;
+      }
+      assert(masterAdminProtected === true, 'Akun Administrator utama (Ketua RT) terproteksi dari penghapusan');
+
+      // Logout Sesi
+      SimStore.logout();
+      assert(SimStore.getCurrentUser() === null, 'Fungsi logout berhasil menghapus sesi login aktif');
+
       // TAMPILKAN SUMMARY
       const summaryDiv = document.getElementById('summary');
       if (failedTests === 0) {

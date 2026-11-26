@@ -68,7 +68,31 @@ Semua data disimpan di dalam media penyimpanan peramban menggunakan kunci terenk
 | `saldoAwalTunai` | `Number` | Saldo permulaan kas tunai di bendahara | `500000` |
 | `qrisImageUrl` | `String` | Gambar barcode QRIS resmi Kas RT | `"assets/img/qris_rt.png"` |
 
-### E. Bagan Akun Standar (*Chart of Accounts / CoA*) Kas RT
+### E. Entitas `simwarga_users` (Master Akun Pengguna & Hak Akses RBAC)
+| Kolom | Tipe Data | Deskripsi | Contoh |
+| :--- | :--- | :--- | :--- |
+| `id` | `String` (PK) | Identifier unik pengguna | `"USR-001"` |
+| `username` | `String` (Unique) | Nama pengguna login (huruf kecil) | `"admin"` |
+| `passwordHash` | `String` | Hash kriptografis SHA-256 kata sandi | `"240be518fabd2724ddb..."` |
+| `namaLengkap` | `String` | Nama lengkap resmi pemegang akun | `"H. Bambang Sudrajat"` |
+| `role` | `String` | Peran hak akses: `admin`, `bendahara`, `sekretaris`, `keamanan`, `warga` | `"admin"` |
+| `roleLabel` | `String` | Label deskriptif peran pengguna | `"Ketua RT (Admin)"` |
+| `jabatan` | `String` | Jabatan dalam struktur pengurus/lingkungan | `"Ketua RT 03"` |
+| `status` | `String` | Status keaktifan: `aktif` atau `nonaktif` | `"aktif"` |
+| `lastLogin` | `String` | Timestamp ISO-8601 sesi login terakhir | `"2026-11-25T18:30:00Z"` |
+
+### F. Entitas `simwarga_auth_session` (Sesi Aktif Terverifikasi)
+| Kolom | Tipe Data | Deskripsi | Contoh |
+| :--- | :--- | :--- | :--- |
+| `userId` | `String` (FK) | Relasi ke `simwarga_users.id` | `"USR-001"` |
+| `username` | `String` | Username sesi aktif | `"admin"` |
+| `namaLengkap` | `String` | Nama lengkap pengguna aktif | `"H. Bambang Sudrajat"` |
+| `role` | `String` | Peran aktif untuk pengecekan RBAC | `"admin"` |
+| `token` | `String` | Token acak verifikasi sesi peramban | `"TKN-A1B2C3-1764123456"` |
+| `loginAt` | `String` | Waktu mulai sesi (ISO-8601) | `"2026-11-25T18:30:00Z"` |
+| `remember` | `Boolean` | Flag penyimpanan permanen (`localStorage`) vs sementara (`sessionStorage`) | `true` |
+
+### G. Bagan Akun Standar (*Chart of Accounts / CoA*) Kas RT
 | Kode Akun | Nama Akun | Kelompok Akun | Keterangan |
 | :---: | :--- | :--- | :--- |
 | **1-101** | **Kas di Tangan (Kas Tunai)** | Aset Lancar | Uang fisik yang dipegang Bendahara RT |

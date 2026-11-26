@@ -6,10 +6,39 @@ Buku panduan ini disusun khusus untuk **Warga**, **Bendahara RT**, dan **Ketua/S
 
 ## 🧭 Daftar Isi Panduan
 
-1. [Untuk Warga: Cara Konfirmasi Bayar Iuran via QR Stiker](#1-panduan-warga-cara-bayar-iuran-via-qr-stiker)
-2. [Untuk Bendahara RT: Cara Verifikasi Bukti & Rekap Kas](#2-panduan-bendahara-rt-verifikasi-bukti--rekap-iuran)
-3. [Untuk Pengurus RT: Cetak Stiker QR & Layanan Surat](#3-panduan-pengurus-rt-stiker-qr--layanan-surat)
-4. [Tips Penting & Tanya Jawab Umum (FAQ)](#4-tanya-jawab-umum-faq)
+1. [Cara Masuk (Login) & Hak Akses Berdasarkan Peran](#0-panduan-login--hak-akses-pengguna)
+2. [Untuk Warga: Cara Konfirmasi Bayar Iuran via QR Stiker](#1-panduan-warga-cara-bayar-iuran-via-qr-stiker)
+3. [Untuk Bendahara RT: Cara Verifikasi Bukti & Rekap Kas](#2-panduan-bendahara-rt-verifikasi-bukti--rekap-iuran)
+4. [Untuk Pengurus RT: Cetak Stiker QR & Layanan Surat](#3-panduan-pengurus-rt-stiker-qr--layanan-surat)
+5. [Tips Penting & Tanya Jawab Umum (FAQ)](#4-tanya-jawab-umum-faq)
+
+---
+
+## 0. Panduan Login & Hak Akses Pengguna
+
+Aplikasi SIMWARGA dilengkapi sistem autentikasi modern dan aman untuk melindungi kerahasiaan data kependudukan warga serta transparansi pembukuan kas lingkungan.
+
+### A. Tabel Akun Bawaan (Demo Siap Pakai)
+Bagi pengguna yang ingin menguji aplikasi di **[https://agungtri.github.io/SIMWARGA/](https://agungtri.github.io/SIMWARGA/)**, tersedia tombol **"Akses Cepat Pengujian (Demo)"** di layar login yang dapat diklik langsung tanpa perlu mengetik manual:
+
+| Peran (Role) | Username | Kata Sandi | Nama Pengguna | Menu yang Dapat Diakses |
+| :--- | :--- | :--- | :--- | :--- |
+| **Ketua RT (Admin)** | `admin` | `admin123` | H. Bambang Sudrajat | **Akses Penuh:** Dashboard, Data Warga & KK, Kas & Iuran, Layanan Surat, Tamu, Keamanan & Ronda, Pengaturan RT & Manajemen User |
+| **Bendahara RT** | `bendahara` | `bendahara123` | Hj. Siti Aminah | Dashboard, Buku Kas Umum, Verifikasi Bukti Bayar QR, Cetak Stiker QR, Laporan Rekapitulasi per Blok |
+| **Sekretaris RT** | `sekretaris` | `sekretaris123` | Hendra Wijaya | Dashboard, Data Induk Warga & KK, Layanan Surat Pengantar RT/RW, Buku Tamu |
+| **Petugas Keamanan** | `keamanan` | `keamanan123` | Pak Joko Sutrisno | Dashboard, Buku Tamu & Rumah Kontrakan, Jadwal Ronda Siskamling & Buku Patroli |
+| **Warga Lingkungan** | `warga` | `warga123` | Budi Santoso | Dashboard Transparansi Kas RT, Status Kartu Iuran Rumah, Pengajuan Surat, dan Akses Portal Bayar QR |
+
+### B. Cara Masuk ke Aplikasi
+1. Buka tautan SIMWARGA di browser laptop atau HP Anda.
+2. Di layar login, masukkan **Username** dan **Kata Sandi**.
+3. Jika ingin login cepat untuk demo, cukup ketuk tombol peran yang diinginkan pada kotak **"Akses Cepat Pengujian (Demo)"**.
+4. Centang **"Ingat sesi di perangkat ini"** jika Anda menggunakan perangkat pribadi.
+5. Klik **"Masuk ke Sistem"**.
+
+### C. Cara Keluar (Logout)
+* Klik ikon keluar (**Logout**) di pojok kanan atas layar atau di bagian bawah bilah navigasi samping (sidebar).
+* Konfirmasikan keluar untuk mengakhiri sesi kerja Anda.
 
 ---
 

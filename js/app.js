@@ -76,6 +76,13 @@ function showToast(message, type = 'success') {
 
 // Navigation Tab Switcher
 function switchTab(tabId) {
+  // Verifikasi Hak Akses Peran Pengguna (RBAC)
+  const currentUser = SimStore.getCurrentUser();
+  if (currentUser && !SimStore.canAccessTab(currentUser.role, tabId)) {
+    showToast(`Akses Ditolak: Peran "${currentUser.roleLabel}" tidak memiliki hak akses ke modul ini.`, 'error');
+    return;
+  }
+
   AppState.currentTab = tabId;
 
   // Update nav item active styles
@@ -2116,6 +2123,7 @@ function renderSettings() {
   const tenantEl = document.getElementById('cloud-tenant-id');
   if (tenantEl) tenantEl.value = cloudConfig.tenantId || 'KL-SUKAMAJU-RW07-RT03';
   updateCloudSyncBadge();
+  renderUsersTable();
 }
 
 function updateCloudSyncBadge() {
@@ -2326,6 +2334,396 @@ function resetToDefaultDatabase() {
   }
 }
 
+// ==========================================
+// MODUL AUTENTIKASI PENGGUNA & RBAC (LOGIN SYSTEM)
+// ==========================================
+
+function togglePasswordVisibility(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const isPassword = input.type === 'password';
+  input.type = isPassword ? 'text' : 'password';
+  const icon = document.getElementById('icon-login-eye');
+  if (icon) {
+    icon.setAttribute('data-lucide', isPassword ? 'eye-off' : 'eye');
+    if (window.lucide) lucide.createIcons();
+  }
+}
+
+async function handleLoginSubmit(event) {
+  if (event) event.preventDefault();
+  const usernameInput = document.getElementById('login-username');
+  const passwordInput = document.getElementById('login-password');
+  const rememberInput = document.getElementById('login-remember');
+  const alertEl = document.getElementById('login-error-alert');
+  const alertText = document.getElementById('login-error-text');
+  const submitBtn = document.getElementById('btn-login-submit');
+
+  if (!usernameInput || !passwordInput) return;
+  const username = usernameInput.value.trim();
+  const password = passwordInput.value;
+  const remember = rememberInput ? rememberInput.checked : true;
+
+  if (alertEl) alertEl.classList.add('hidden');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span><span>Memverifikasi...</span>';
+  }
+
+  try {
+    const res = await SimStore.authenticate(username, password, remember);
+    if (!res.success) {
+      if (alertEl && alertText) {
+        alertText.textContent = res.message || 'Username atau kata sandi tidak sesuai.';
+        alertEl.classList.remove('hidden');
+      }
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i data-lucide="log-in" class="w-4 h-4"></i><span>Masuk ke Sistem</span>';
+        if (window.lucide) lucide.createIcons();
+      }
+      return;
+    }
+
+    // Login Sukses
+    passwordInput.value = '';
+    updateAuthUI(res.user);
+    showToast(`Selamat datang, ${res.user.namaLengkap}! (${res.user.roleLabel})`, 'success');
+
+    // Alihkan ke modul yang diizinkan untuk peran ini
+    const allowed = SimStore.getAllowedTabs(res.user.role);
+    if (allowed.includes('dashboard')) {
+      switchTab('dashboard');
+    } else if (allowed.length > 0) {
+      switchTab(allowed[0]);
+    }
+  } catch (err) {
+    console.error('Error saat login:', err);
+    if (alertEl && alertText) {
+      alertText.textContent = 'Terjadi kesalahan sistem saat verifikasi akun.';
+      alertEl.classList.remove('hidden');
+    }
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<i data-lucide="log-in" class="w-4 h-4"></i><span>Masuk ke Sistem</span>';
+      if (window.lucide) lucide.createIcons();
+    }
+  }
+}
+
+async function quickLogin(roleKey) {
+  const credentials = {
+    admin: { u: 'admin', p: 'admin123' },
+    bendahara: { u: 'bendahara', p: 'bendahara123' },
+    sekretaris: { u: 'sekretaris', p: 'sekretaris123' },
+    keamanan: { u: 'keamanan', p: 'keamanan123' },
+    warga: { u: 'warga', p: 'warga123' }
+  };
+  const target = credentials[roleKey] || credentials.admin;
+  const usernameInput = document.getElementById('login-username');
+  const passwordInput = document.getElementById('login-password');
+  if (usernameInput) usernameInput.value = target.u;
+  if (passwordInput) passwordInput.value = target.p;
+  await handleLoginSubmit();
+}
+
+function handleLogout() {
+  const current = SimStore.getCurrentUser();
+  const userName = current ? current.namaLengkap : 'Pengguna';
+  if (confirm(`Apakah Anda yakin ingin keluar dari akun (${userName})?`)) {
+    SimStore.logout();
+    updateAuthUI(null);
+    showToast('Anda telah keluar dari sistem SIMWARGA.', 'info');
+  }
+}
+
+function updateAuthUI(user) {
+  const overlay = document.getElementById('auth-overlay');
+  const headerUserName = document.getElementById('header-user-name');
+  const headerUserRole = document.getElementById('header-user-role');
+  const headerUserAvatar = document.getElementById('header-user-avatar');
+  const sidebarUserName = document.getElementById('sidebar-user-name');
+  const sidebarUserRole = document.getElementById('sidebar-user-role');
+  const sidebarUserAvatar = document.getElementById('sidebar-user-avatar');
+
+  if (!user) {
+    if (overlay) overlay.classList.remove('hidden');
+    return;
+  }
+
+  // Sembunyikan form login modal
+  if (overlay) overlay.classList.add('hidden');
+
+  // Hitung inisial nama
+  const initials = (user.namaLengkap || user.username || 'RT')
+    .split(' ')
+    .filter(Boolean)
+    .map(p => p[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
+  // Warna avatar berdasarkan role
+  const bgColors = {
+    admin: 'bg-blue-600',
+    bendahara: 'bg-emerald-600',
+    sekretaris: 'bg-purple-600',
+    keamanan: 'bg-amber-600',
+    warga: 'bg-slate-700'
+  };
+  const colorClass = bgColors[user.role] || 'bg-blue-600';
+
+  if (headerUserAvatar) {
+    headerUserAvatar.textContent = initials;
+    headerUserAvatar.className = `w-7 h-7 rounded-lg ${colorClass} text-white flex items-center justify-center font-bold text-xs uppercase shadow-sm`;
+  }
+  if (headerUserName) headerUserName.textContent = user.namaLengkap || user.username;
+  if (headerUserRole) headerUserRole.textContent = user.roleLabel || user.role;
+
+  if (sidebarUserAvatar) {
+    sidebarUserAvatar.textContent = initials;
+    sidebarUserAvatar.className = `w-8 h-8 rounded-xl ${colorClass} text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-sm`;
+  }
+  if (sidebarUserName) sidebarUserName.textContent = user.namaLengkap || user.username;
+  if (sidebarUserRole) sidebarUserRole.textContent = user.roleLabel || user.role;
+
+  // Filter Navigasi Sidebar berdasarkan Role (RBAC)
+  const allowed = SimStore.getAllowedTabs(user.role);
+  document.querySelectorAll('.nav-item').forEach(btn => {
+    const tabId = btn.getAttribute('data-tab');
+    if (!tabId) return;
+    if (user.role === 'admin' || allowed.includes(tabId)) {
+      btn.classList.remove('hidden');
+    } else {
+      btn.classList.add('hidden');
+    }
+  });
+
+  // Visibilitas Bagian Pengaturan Khusus Admin
+  const secUserMgmt = document.getElementById('section-user-management');
+  if (secUserMgmt) {
+    if (user.role === 'admin') {
+      secUserMgmt.classList.remove('hidden');
+    } else {
+      secUserMgmt.classList.add('hidden');
+    }
+  }
+
+  // Re-create lucide icons for updated elements
+  if (window.lucide) {
+    lucide.createIcons();
+  }
+}
+
+// ==========================================
+// MODUL MANAJEMEN AKUN PENGGUNA (SETTINGS)
+// ==========================================
+
+function renderUsersTable() {
+  const tbody = document.getElementById('table-users-body');
+  if (!tbody) return;
+
+  const users = SimStore.getUsers();
+  const currentUser = SimStore.getCurrentUser();
+
+  const roleColors = {
+    admin: 'bg-blue-50 text-blue-700 border-blue-200',
+    bendahara: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    sekretaris: 'bg-purple-50 text-purple-700 border-purple-200',
+    keamanan: 'bg-amber-50 text-amber-700 border-amber-200',
+    warga: 'bg-slate-100 text-slate-700 border-slate-200'
+  };
+
+  tbody.innerHTML = users.map(u => {
+    const initials = (u.namaLengkap || u.username)
+      .split(' ')
+      .filter(Boolean)
+      .map(p => p[0])
+      .slice(0, 2)
+      .join('')
+      .toUpperCase();
+
+    const isCurrent = currentUser && currentUser.userId === u.id;
+    const isMasterAdmin = u.id === 'USR-001';
+    const roleBadge = roleColors[u.role] || 'bg-slate-100 text-slate-700 border-slate-200';
+    const statusBadge = u.status === 'aktif' 
+      ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Aktif</span>'
+      : '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200"><span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>Nonaktif</span>';
+
+    const lastLoginFormatted = u.lastLogin ? formatDate(u.lastLogin) : '<span class="text-slate-400 italic">Belum pernah</span>';
+
+    return `
+      <tr class="hover:bg-slate-50 transition-colors">
+        <td class="py-3 px-4">
+          <div class="flex items-center gap-2.5">
+            <div class="w-7 h-7 rounded-lg bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-xs">
+              ${initials}
+            </div>
+            <div>
+              <p class="font-bold text-slate-800 flex items-center gap-1">
+                <span>${u.namaLengkap}</span>
+                ${isCurrent ? '<span class="px-1.5 py-0.2 rounded text-[9px] bg-blue-100 text-blue-700 font-bold">Anda</span>' : ''}
+              </p>
+              <p class="text-[11px] text-slate-400 font-mono">@${u.username}</p>
+            </div>
+          </div>
+        </td>
+        <td class="py-3 px-4">
+          <span class="inline-block px-2.5 py-1 rounded-xl text-[11px] font-bold border ${roleBadge}">
+            ${u.roleLabel || u.role}
+          </span>
+        </td>
+        <td class="py-3 px-4 text-slate-600">${u.jabatan || '-'}</td>
+        <td class="py-3 px-4">${statusBadge}</td>
+        <td class="py-3 px-4 text-slate-500">${lastLoginFormatted}</td>
+        <td class="py-3 px-4 text-center">
+          <div class="flex items-center justify-center gap-1">
+            <button onclick="openModalUser('${u.id}')" title="Edit Akun" class="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors">
+              <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+            </button>
+            ${(!isMasterAdmin && !isCurrent) ? `
+              <button onclick="handleDeleteUser('${u.id}')" title="Hapus Akun" class="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+            ` : ''}
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  if (window.lucide) lucide.createIcons();
+}
+
+function openModalUser(userId = null) {
+  const modal = document.getElementById('modal-user');
+  const title = document.getElementById('modal-user-title');
+  const idInput = document.getElementById('input-user-id');
+  const usernameInput = document.getElementById('input-user-username');
+  const passwordInput = document.getElementById('input-user-password');
+  const namaInput = document.getElementById('input-user-nama');
+  const roleInput = document.getElementById('input-user-role');
+  const jabatanInput = document.getElementById('input-user-jabatan');
+  const statusInput = document.getElementById('input-user-status');
+  const passReq = document.getElementById('label-user-password-req');
+  const passHint = document.getElementById('hint-user-password');
+
+  if (!modal) return;
+
+  if (userId) {
+    const user = SimStore.getUserById(userId);
+    if (!user) return;
+    title.textContent = 'Edit Akun Pengguna';
+    idInput.value = user.id;
+    usernameInput.value = user.username;
+    passwordInput.value = '';
+    passwordInput.required = false;
+    namaInput.value = user.namaLengkap;
+    roleInput.value = user.role;
+    jabatanInput.value = user.jabatan || '';
+    statusInput.value = user.status || 'aktif';
+
+    if (passReq) passReq.classList.add('hidden');
+    if (passHint) passHint.classList.remove('hidden');
+
+    // Khusus admin utama tidak boleh diganti role / status nonaktif
+    if (user.id === 'USR-001') {
+      roleInput.disabled = true;
+      statusInput.disabled = true;
+    } else {
+      roleInput.disabled = false;
+      statusInput.disabled = false;
+    }
+  } else {
+    title.textContent = 'Tambah Akun Pengguna Baru';
+    idInput.value = '';
+    usernameInput.value = '';
+    passwordInput.value = '';
+    passwordInput.required = true;
+    namaInput.value = '';
+    roleInput.value = 'warga';
+    roleInput.disabled = false;
+    jabatanInput.value = '';
+    statusInput.value = 'aktif';
+    statusInput.disabled = false;
+
+    if (passReq) passReq.classList.remove('hidden');
+    if (passHint) passHint.classList.add('hidden');
+  }
+
+  modal.classList.remove('hidden');
+  if (window.lucide) lucide.createIcons();
+}
+
+function closeModalUser() {
+  const modal = document.getElementById('modal-user');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function handleSaveUser(event) {
+  if (event) event.preventDefault();
+  const id = document.getElementById('input-user-id').value;
+  const username = document.getElementById('input-user-username').value.trim();
+  const password = document.getElementById('input-user-password').value;
+  const nama = document.getElementById('input-user-nama').value.trim();
+  const role = document.getElementById('input-user-role').value;
+  const jabatan = document.getElementById('input-user-jabatan').value.trim();
+  const status = document.getElementById('input-user-status').value;
+
+  try {
+    if (id) {
+      // Update
+      const updateData = {
+        username,
+        namaLengkap: nama,
+        role,
+        jabatan,
+        status
+      };
+      if (password && password.trim()) {
+        updateData.password = password.trim();
+      }
+      await SimStore.updateUser(id, updateData);
+      showToast('Akun pengguna berhasil diperbarui!');
+    } else {
+      // Create
+      if (!password || password.length < 6) {
+        showToast('Kata sandi minimal 6 karakter.', 'error');
+        return;
+      }
+      await SimStore.addUser({
+        username,
+        password: password.trim(),
+        namaLengkap: nama,
+        role,
+        jabatan,
+        status
+      });
+      showToast('Akun pengguna baru berhasil ditambahkan!');
+    }
+
+    closeModalUser();
+    renderUsersTable();
+  } catch (err) {
+    showToast(err.message || 'Gagal menyimpan akun pengguna.', 'error');
+  }
+}
+
+function handleDeleteUser(userId) {
+  const user = SimStore.getUserById(userId);
+  if (!user) return;
+  if (confirm(`Hapus akun "${user.namaLengkap}" (@${user.username})? Tindakan ini tidak dapat dibatalkan.`)) {
+    try {
+      SimStore.deleteUser(userId);
+      showToast('Akun pengguna berhasil dihapus.');
+      renderUsersTable();
+    } catch (err) {
+      showToast(err.message || 'Gagal menghapus pengguna.', 'error');
+    }
+  }
+}
+
 // Initializer on Page Load
 document.addEventListener('DOMContentLoaded', () => {
   // Lucide icons
@@ -2333,8 +2731,19 @@ document.addEventListener('DOMContentLoaded', () => {
     lucide.createIcons();
   }
 
-  // Setup view
-  renderDashboard();
+  // Inisialisasi Sesi Autentikasi Pengguna
+  const currentUser = SimStore.getCurrentUser();
+  updateAuthUI(currentUser);
+
+  if (currentUser) {
+    // Setup view sesuai tab aktif atau hak akses yang diizinkan
+    if (SimStore.canAccessTab(currentUser.role, AppState.currentTab)) {
+      renderDashboard();
+    } else {
+      const allowed = SimStore.getAllowedTabs(currentUser.role);
+      if (allowed.length > 0) switchTab(allowed[0]);
+    }
+  }
 
   // Search warga listener
   const searchInput = document.getElementById('search-warga');
